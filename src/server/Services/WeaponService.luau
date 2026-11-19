@@ -319,7 +319,7 @@ local function onMelee(player: Player, lookDir, claimedPart)
 	local claimedEnemy = typeof(claimedPart) == "Instance" and EnemyService.GetEnemyFromPart(claimedPart)
 	local best, bestScore = nil, math.huge
 	for _, model in EnemyService.GetFolder():GetChildren() do
-		local enemy = model.PrimaryPart and EnemyService.GetEnemyFromPart(model.PrimaryPart)
+		local enemy = model:IsA("Model") and model.PrimaryPart and EnemyService.GetEnemyFromPart(model.PrimaryPart)
 		if enemy then
 			local to = enemy.root.Position - head.Position
 			local dist = to.Magnitude

@@ -12,6 +12,8 @@ local WaveConfig = require(game.ReplicatedStorage.Shared.Config.WaveConfig)
 local Signal = require(game.ReplicatedStorage.Shared.Util.Signal)
 local MapService = require(script.Parent.MapService)
 local PlayerService = require(script.Parent.PlayerService)
+local BarrierService = require(script.Parent.BarrierService)
+local GameConfigRef = require(game.ReplicatedStorage.Shared.Config.GameConfig)
 
 local EnemyService = {}
 EnemyService.EnemyDied = Signal.new() -- (enemyData, killer: Player?, wasHeadshot: boolean)
@@ -124,7 +126,11 @@ function EnemyService.Spawn(enemyId: string, wave: number)
 	local stats = EnemyConfig.Enemies[enemyId]
 	assert(stats, "Unknown enemy " .. tostring(enemyId))
 
-	local model = buildModel(stats, MapService.GetEnemySpawnPosition())
+	local spawnInfo = MapService.GetEnemySpawn()
+	if not spawnInfo then
+		return nil
+	end
+	local model = buildModel(stats, spawnInfo.pos)
 	local humanoid = model.Humanoid
 	local maxHealth = math.floor(stats.BaseHealth * WaveConfig.HealthMultiplier(wave))
 	humanoid.MaxHealth = maxHealth
@@ -137,11 +143,60 @@ function EnemyService.Spawn(enemyId: string, wave: number)
 		end
 	end
 
-	model.Parent = enemiesFolder
-	model.PrimaryPart:SetNetworkOwner(nil) -- server-owned physics: no client control, no ownership jitter
+	local root = model.PrimaryPart
+	local busyUntil = 0
+	if spawnInfo.emerge then
+		-- Claw up out of the ground: start below, rise, then hand over to physics.
+		local finalCf = root.CFrame
+		root.Anchored = true
+		root.CFrame = finalCf - Vector3.new(0, 6, 0)
+		model.Parent = enemiesFolder
+		TweenService:Create(root, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = finalCf }):Play()
+		busyUntil = os.clock() + 1.15
+		task.delay(1.15, function()
+			if root.Parent then
+				root.Anchored = false
+				pcall(function()
+					root:SetNetworkOwner(nil)
+				end)
+			end
+		end)
+		-- dirt burst
+		local burst = Instance.new("Part")
+		burst.Anchored, burst.CanCollide, burst.CanQuery, burst.CanTouch = true, false, false, false
+		burst.Transparency = 1
+		burst.Position = finalCf.Position - Vector3.new(0, HIP_HEIGHT + 1, 0)
+		burst.Name = "SpawnDirt"
+		burst.Parent = workspace -- NOT the Enemies folder: everything in there must be an enemy Model
+		local e = Instance.new("ParticleEmitter")
+		e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		e.Color = ColorSequence.new(Color3.fromRGB(110, 90, 70))
+		e.Size = NumberSequence.new(1.5, 4)
+		e.Transparency = NumberSequence.new(0.3, 1)
+		e.Lifetime = NumberRange.new(0.8, 1.2)
+		e.Speed = NumberRange.new(6, 10)
+		e.SpreadAngle = Vector2.new(50, 50)
+		e.Rate = 0
+		e.Parent = burst
+		e:Emit(18)
+		task.delay(2, function()
+			burst:Destroy()
+		end)
+	else
+		model.Parent = enemiesFolder
+		root:SetNetworkOwner(nil) -- server-owned physics: no client control, no ownership jitter
+		if spawnInfo.barrier then
+			-- face the window
+			local inside = spawnInfo.barrier:GetAttribute("Inside")
+			root.CFrame = CFrame.lookAt(root.Position, Vector3.new(inside.X, root.Position.Y, inside.Z))
+		end
+	end
 	CollectionService:AddTag(model, "Enemy")
 
 	enemies[model] = {
+		busyUntil = busyUntil,
+		barrier = spawnInfo.barrier, -- set while outside a boarded window
+		lastTear = os.clock(),
 		model = model,
 		humanoid = humanoid,
 		root = model.PrimaryPart,
@@ -373,7 +428,58 @@ local function aiTick(dt: number)
 		if data.dead or not data.root.Parent then
 			continue
 		end
+		if now < (data.busyUntil or 0) then
+			continue -- emerging from the ground or vaulting through a window
+		end
 		local root, hum = data.root, data.humanoid
+
+		-- Outside a boarded window: walk to it, tear boards off, then vault in.
+		if data.barrier then
+			local barrier = data.barrier
+			if not barrier.Parent then
+				data.barrier = nil -- map was rebuilt
+			else
+				local outside = barrier:GetAttribute("Outside")
+				local flat = Vector3.new(outside.X - root.Position.X, 0, outside.Z - root.Position.Z)
+				if flat.Magnitude > 2.5 then
+					hum:MoveTo(Vector3.new(outside.X, root.Position.Y, outside.Z))
+				elseif (barrier:GetAttribute("Boards") or 0) > 0 then
+					hum:MoveTo(root.Position)
+					if now - data.lastTear >= GameConfigRef.Barrier.TearInterval then
+						data.lastTear = now
+						BarrierService.TearBoard(barrier)
+						if now >= data.nextGroan then
+							playSound(data, "ZombieAttack")
+						end
+					end
+				else
+					-- Vault: tween through the opening to the inside point
+					local inside = barrier:GetAttribute("Inside")
+					local vaultTime = GameConfigRef.Barrier.VaultTime
+					data.barrier = nil
+					data.busyUntil = now + vaultTime + 0.05
+					root.Anchored = true
+					local look = CFrame.lookAt(inside, inside + (inside - outside).Unit)
+					local mid = (root.Position + inside) / 2 + Vector3.new(0, 2.5, 0)
+					local t1 = TweenService:Create(root, TweenInfo.new(vaultTime / 2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = look.Rotation + mid })
+					local t2 = TweenService:Create(root, TweenInfo.new(vaultTime / 2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { CFrame = look })
+					t1.Completed:Connect(function()
+						t2:Play()
+					end)
+					t2.Completed:Connect(function()
+						if root.Parent and not data.dead then
+							root.Anchored = false
+							pcall(function()
+								root:SetNetworkOwner(nil)
+							end)
+						end
+					end)
+					t1:Play()
+				end
+				continue
+			end
+		end
+
 		local target, dist = nearestTarget(root.Position, characters)
 
 		if not target then

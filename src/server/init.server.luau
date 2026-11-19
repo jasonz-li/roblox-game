@@ -8,6 +8,7 @@ local ORDER = {
 	"MapService",
 	"CurrencyService",
 	"PlayerService",
+	"BarrierService",
 	"EnemyService",
 	"WeaponService",
 	"PerkService",

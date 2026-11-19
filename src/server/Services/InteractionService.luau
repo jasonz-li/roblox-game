@@ -16,6 +16,7 @@ local WeaponService = require(script.Parent.WeaponService)
 local PerkService = require(script.Parent.PerkService)
 local MapService = require(script.Parent.MapService)
 local MysteryBoxService = require(script.Parent.MysteryBoxService)
+local BarrierService = require(script.Parent.BarrierService)
 
 local InteractionService = {}
 
@@ -105,6 +106,10 @@ function handlers.Forge(player: Player, _part: BasePart)
 	WeaponService.UpgradeCurrent(player)
 	sound(player, "PerkDrink")
 	message(player, "Forged: " .. WeaponConfig.Get(w.id, true).DisplayName, "good")
+end
+
+function handlers.Barrier(player: Player, part: BasePart)
+	BarrierService.Repair(player, part)
 end
 
 function handlers.MysteryBox(player: Player, _part: BasePart)

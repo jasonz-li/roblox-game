@@ -390,7 +390,7 @@ local function updateThreats(dt)
 	local list = {}
 	if root and hum and hum.Health > 0 and enemies then
 		for _, m in enemies:GetChildren() do
-			local r = m.PrimaryPart
+			local r = m:IsA("Model") and m.PrimaryPart
 			if r and r.CanQuery then
 				local d = (r.Position - root.Position).Magnitude
 				if d <= THREAT_RANGE then

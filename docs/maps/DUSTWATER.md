@@ -56,8 +56,15 @@ road + sidewalks · whole town ≈ 560 × 340 studs (layout v2).
    floor, roofs.
 3. **Environment:** debris, wrecked vehicles, cracked roads, fire and smoke,
    lighting.
-4. **Gameplay:** boarded windows (zombies tear boards off, players rebuild them
-   for points), spawn tuning, boss arena setup.
+4. ✅ **Gameplay** (2026-11-19): **11 boarded windows** cut into the boundary
+   walls (Elm Lane 4, Main Street 2, Gas Station 3, Alley 2). Zombies appear
+   outside a window, tear off 1 board every 1.25 s (6 boards), then vault in.
+   Players hold **E** at a damaged window to rebuild a board: +10 pts, capped at
+   100 per player per wave. You can shoot through the boards. 75% of spawns use
+   windows (closest to players first). The rest climb out of the ground with a
+   dirt burst; the Motel and Lab only use ground spawns. The boss arena is
+   marked on Main Street (a `BossArena` volume plus 2 `BossSpawn` markers) for
+   Milestone 5.
 5. **Polish:** materials, small details, atmosphere, performance.
 
 ## Tech notes

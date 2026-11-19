@@ -330,7 +330,7 @@ local function melee()
 	local enemies = workspace:FindFirstChild("Enemies")
 	if enemies then
 		for _, m in enemies:GetChildren() do
-			local r = m.PrimaryPart
+			local r = m:IsA("Model") and m.PrimaryPart
 			if r and r.CanQuery then
 				local to = r.Position - cam.CFrame.Position
 				local d = to.Magnitude

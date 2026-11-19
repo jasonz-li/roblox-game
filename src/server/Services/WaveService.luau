@@ -54,9 +54,12 @@ local function runWave()
 	local interval = WaveConfig.SpawnInterval(wave)
 	while spawned < totalThisWave and not gameOver do
 		if EnemyService.AliveCount() < EnemyConfig.MaxAlive then
-			EnemyService.Spawn("Shambler", wave)
-			spawned += 1
-			task.wait(interval)
+			if EnemyService.Spawn("Shambler", wave) then
+				spawned += 1
+				task.wait(interval)
+			else
+				task.wait(0.5) -- no valid spawn right now; try again shortly
+			end
 		else
 			task.wait(0.25)
 		end

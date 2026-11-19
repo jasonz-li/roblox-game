@@ -93,9 +93,19 @@ local function buildWalls()
 		local y = w.y or 0
 		local wallColor = w.color or Layout.WallColor or Color3.fromRGB(52, 48, 62)
 		local material = w.material and Enum.Material[w.material] or Enum.Material.Brick
-		-- Split the wall line around door gaps
+		-- Split the wall line around door gaps + boarded-window gaps (auto from Layout.Barriers)
+		local gaps = table.clone(w.gaps or {})
+		for _, b in Layout.Barriers or {} do
+			if b.Axis == w.axis and math.abs(b.At - w.at) < 0.01 and b.Along > w.from and b.Along < w.to then
+				local half = (b.Width or 6) / 2
+				table.insert(gaps, { b.Along - half, b.Along + half })
+			end
+		end
+		table.sort(gaps, function(p, q)
+			return p[1] < q[1]
+		end)
 		local cuts = { w.from }
-		for _, g in w.gaps or {} do
+		for _, g in gaps do
 			table.insert(cuts, g[1])
 			table.insert(cuts, g[2])
 		end
@@ -290,6 +300,91 @@ local function buildMarkers()
 		})
 		m:SetAttribute("Zone", s.Zone)
 		CollectionService:AddTag(m, "EnemySpawn")
+	end
+end
+
+-- Boarded windows. Each fills its wall gap with a sill, lintel, an invisible blocker
+-- (always solid for everyone; zombies "vault" over it with a tween) and N boards.
+-- State lives in attributes on the blocker (tag "Barrier"): Boards, MaxBoards, Zone,
+-- Outside, Inside (Vector3). BarrierService owns tearing/repairing.
+local function buildBarriers()
+	local GameConfigB = GameConfig.Barrier
+	for i, b in Layout.Barriers or {} do
+		local width = b.Width or 6
+		local sill, openH = b.Sill or 3, b.Height or 5.5
+		local wallH = b.WallHeight or Layout.WallHeight
+		local inward = b.Inward.Unit
+		local center = b.Axis == "x" and Vector3.new(b.Along, 0, b.At) or Vector3.new(b.At, 0, b.Along)
+		local sizeAlong = function(h)
+			return b.Axis == "x" and Vector3.new(width, h, 2) or Vector3.new(2, h, width)
+		end
+		local wallColor = Color3.fromRGB(120, 92, 70)
+		local wallMat = wallH > 20 and Enum.Material.Rock or Enum.Material.Brick
+		if wallH <= 20 then
+			wallColor = Layout.WallColor or wallColor
+		end
+		part({ Name = "BarrierSill", Size = sizeAlong(sill), Position = center + Vector3.new(0, sill / 2, 0), Color = wallColor, Material = wallMat })
+		part({ Name = "BarrierLintel", Size = sizeAlong(wallH - sill - openH), Position = center + Vector3.new(0, sill + openH + (wallH - sill - openH) / 2, 0), Color = wallColor, Material = wallMat })
+		-- window frame trim
+		part({ Name = "BarrierFrame", Size = sizeAlong(0.4) + (b.Axis == "x" and Vector3.new(0.6, 0, 0.3) or Vector3.new(0.3, 0, 0.6)), Position = center + Vector3.new(0, sill + openH + 0.2, 0), Color = Color3.fromRGB(70, 52, 40), Material = Enum.Material.Wood })
+
+		local blocker = part({
+			Name = "Barrier" .. i,
+			Size = sizeAlong(openH),
+			Position = center + Vector3.new(0, sill + openH / 2, 0),
+			Transparency = 1,
+			CanQuery = false, -- bullets pass through to zombies outside
+		})
+		blocker:SetAttribute("Kind", "Barrier")
+		blocker:SetAttribute("Id", "Barrier" .. i)
+		blocker:SetAttribute("Cost", 0)
+		blocker:SetAttribute("Title", "Boarded window")
+		blocker:SetAttribute("Zone", b.Zone)
+		blocker:SetAttribute("Boards", GameConfigB.Boards)
+		blocker:SetAttribute("MaxBoards", GameConfigB.Boards)
+		blocker:SetAttribute("Outside", center - inward * 4 + Vector3.new(0, 3, 0))
+		blocker:SetAttribute("Inside", center + inward * 4.5 + Vector3.new(0, 3, 0))
+
+		-- Boards: planks across the inner face of the opening, staggered and slightly crooked
+		local rngB = Random.new(i * 7919)
+		for n = 1, GameConfigB.Boards do
+			local y = sill + 0.5 + (n - 0.5) * (openH - 1) / GameConfigB.Boards
+			local along = b.Axis == "x" and Vector3.new(width + 0.8, 0.55, 0.25) or Vector3.new(0.25, 0.55, width + 0.8)
+			local roll = math.rad(rngB:NextNumber(-12, 12))
+			local cf = CFrame.new(center + Vector3.new(0, y, 0) + inward * 1.15)
+				* (b.Axis == "x" and CFrame.Angles(0, 0, roll) or CFrame.Angles(roll, 0, 0))
+			local board = part({
+				Name = "Board" .. n,
+				Size = along,
+				CFrame = cf,
+				Color = Color3.fromRGB(rngB:NextInteger(110, 140), rngB:NextInteger(80, 100), rngB:NextInteger(55, 70)),
+				Material = Enum.Material.WoodPlanks,
+				CanCollide = false,
+				CanQuery = false,
+			})
+			board:SetAttribute("HomeCFrame", cf)
+			board.Parent = blocker
+		end
+
+		-- Little ledge outside so zombies have ground to stand on (some walls sit on the map edge)
+		part({ Name = "BarrierLedge", Size = Vector3.new(8, 1, 8), Position = center - inward * 5 + Vector3.new(0, -0.5, 0), Color = Color3.fromRGB(120, 100, 80), Material = Enum.Material.Ground })
+
+		CollectionService:AddTag(blocker, "Barrier")
+		CollectionService:AddTag(blocker, "Interactable")
+	end
+end
+
+-- Boss arena (Milestone 5): an invisible volume + boss spawn markers
+local function buildBossArena()
+	local a = Layout.BossArena
+	if not a then
+		return
+	end
+	local vol = part({ Name = "BossArena", Size = a.Size, Position = a.Center + Vector3.new(0, a.Size.Y / 2, 0), Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false })
+	CollectionService:AddTag(vol, "BossArena")
+	for i, p in a.BossSpawns or {} do
+		local m = part({ Name = "BossSpawn" .. i, Size = Vector3.new(6, 0.2, 6), Position = p + Vector3.new(0, 0.1, 0), Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false })
+		CollectionService:AddTag(m, "BossSpawn")
 	end
 end
 
@@ -588,11 +683,13 @@ local function build()
 		buildProps()
 	end
 	buildWalls()
+	buildBarriers()
 	buildDoors()
 	buildWallBuys()
 	buildPerks()
 	buildForge()
 	buildMarkers()
+	buildBossArena()
 	mapFolder.Parent = workspace
 	-- Maps that bring their own ground (with holes for basements) remove the Rojo baseplate at runtime.
 	if Layout.OwnGround then
@@ -661,40 +758,81 @@ function MapService.GetPlayerSpawnCFrame(): CFrame
 	return CFrame.new(Layout.PlayerSpawn + Vector3.new(math.cos(a) * 5, 3, math.sin(a) * 5))
 end
 
--- Spawn near the action: unlocked zones, not on top of a player, not too far from one.
-function MapService.GetEnemySpawnPosition(): Vector3
+local function playerRoots()
 	local roots = {}
 	for _, plr in Players:GetPlayers() do
 		local root = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-		if root then
+		local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+		if root and hum and hum.Health > 0 then
 			table.insert(roots, root.Position)
 		end
 	end
+	return roots
+end
+
+local function nearestDist(roots, pos)
+	local best = math.huge
+	for _, r in roots do
+		best = math.min(best, (r - pos).Magnitude)
+	end
+	return best
+end
+
+-- Pick from candidates: prefer ones 22..maxNear studs from the nearest living player.
+local function pickNear(list, getPos, roots, maxNear)
 	local preferred, fallback = {}, {}
+	for _, c in list do
+		local d = nearestDist(roots, getPos(c))
+		if d >= 22 then
+			table.insert(fallback, c)
+			if d <= maxNear then
+				table.insert(preferred, c)
+			end
+		end
+	end
+	local pool = #preferred > 0 and preferred or (#fallback > 0 and fallback or list)
+	return #pool > 0 and pool[math.random(1, #pool)] or nil
+end
+
+-- Where the next zombie comes from: a boarded window (most of the time) or a ground spawn.
+-- Returns { pos: Vector3, barrier: BasePart? , emerge: boolean }
+function MapService.GetEnemySpawn()
+	local roots = playerRoots()
+	local barriers, grounds = {}, {}
+	for _, b in CollectionService:GetTagged("Barrier") do
+		if b:IsDescendantOf(mapFolder) and unlocked[b:GetAttribute("Zone")] then
+			table.insert(barriers, b)
+		end
+	end
 	for _, s in CollectionService:GetTagged("EnemySpawn") do
 		if s:IsDescendantOf(mapFolder) and unlocked[s:GetAttribute("Zone")] then
-			local nearest = math.huge
-			for _, r in roots do
-				nearest = math.min(nearest, (r - s.Position).Magnitude)
-			end
-			if nearest >= 22 then
-				table.insert(fallback, s)
-				if nearest <= 85 then
-					table.insert(preferred, s)
-				end
-			end
+			table.insert(grounds, s)
 		end
 	end
-	local list = #preferred > 0 and preferred or fallback
-	if #list == 0 then
-		for _, s in CollectionService:GetTagged("EnemySpawn") do
-			if s:IsDescendantOf(mapFolder) and unlocked[s:GetAttribute("Zone")] then
-				table.insert(list, s)
-			end
+	local useBarrier = #barriers > 0 and (#grounds == 0 or math.random() < GameConfig.Barrier.BarrierSpawnChance)
+	if useBarrier then
+		local b = pickNear(barriers, function(x)
+			return x:GetAttribute("Inside")
+		end, roots, 110)
+		if b then
+			local out = b:GetAttribute("Outside")
+			local side = (b:GetAttribute("Inside") - out).Unit:Cross(Vector3.yAxis)
+			return { pos = out - Vector3.new(0, 3, 0) + side * math.random(-15, 15) / 10, barrier = b, emerge = false }
 		end
 	end
-	local chosen = list[math.random(1, #list)]
-	return chosen.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3))
+	local s = pickNear(grounds, function(x)
+		return x.Position
+	end, roots, 85)
+	if not s then
+		return nil
+	end
+	return { pos = s.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3)), barrier = nil, emerge = true }
+end
+
+-- Back-compat helper
+function MapService.GetEnemySpawnPosition(): Vector3
+	local info = MapService.GetEnemySpawn()
+	return info and info.pos or Layout.PlayerSpawn
 end
 
 return MapService
