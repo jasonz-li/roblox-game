@@ -8,13 +8,13 @@ export type SoundDef = { Ids: { string }, Volume: number, PitchVariance: number?
 
 local SoundConfig: { [string]: SoundDef } = {
 	-- Weapons (client, 2D for the shooter)
-	-- Two close-range rifle recordings, randomly alternated so autofire doesn't sound like a loop
-	RifleShot = { Ids = { "rbxassetid://107457358196366", "rbxassetid://76727380063178" }, Volume = 0.55, PitchVariance = 0.05 },
-	HeavyShot = { Ids = { "rbxassetid://6975483207" }, Volume = 0.7, PitchVariance = 0.04 },
-	-- Low "thump" layered under every shot for weight (Pro Sound Effects bullet impact, pitched down)
-	ShotThump = { Ids = { "rbxassetid://9113632382" }, Volume = 0.22, PitchVariance = 0.08 },
-	ShotgunShot = { Ids = { "rbxassetid://113543931016554" }, Volume = 0.5, PitchVariance = 0.05 },
-	LaserShot = { Ids = { "rbxassetid://4400449399" }, Volume = 0.5, PitchVariance = 0.05 },
+	-- Main gunshot. Pick the recording in-game with F6 (see GunshotCandidates below).
+	RifleShot = { Ids = { "rbxassetid://107457358196366" }, Volume = 0.3, PitchVariance = 0.05 },
+	HeavyShot = { Ids = { "rbxassetid://6975483207" }, Volume = 0.4, PitchVariance = 0.04 },
+	-- Low "thump" layered under every shot for weight (toggle in-game with F7)
+	ShotThump = { Ids = { "rbxassetid://9113632382" }, Volume = 0.1, PitchVariance = 0.08 },
+	ShotgunShot = { Ids = { "rbxassetid://113543931016554" }, Volume = 0.35, PitchVariance = 0.05 },
+	LaserShot = { Ids = { "rbxassetid://4400449399" }, Volume = 0.35, PitchVariance = 0.05 },
 	WeaponSwitch = { Ids = { "rbxasset://sounds/clickfast.wav" }, Volume = 0.4 },
 
 	-- Economy / map (Pro Sound Effects + APM: Roblox-licensed library audio)

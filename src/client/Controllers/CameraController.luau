@@ -79,27 +79,41 @@ function CameraController.Start()
 		end
 	end)
 
-	-- Runs right after the default camera script has positioned the camera,
-	-- so the kick is layered on top and decays back to the player's aim.
+	-- Runs right after the default camera script has positioned the camera.
+	-- IMPORTANT: Roblox's camera builds each frame from the previous camera CFrame, so any
+	-- rotation we add carries over. We therefore apply only the CHANGE in our offset each
+	-- frame (desired - applied). The visible offset then equals `desired`, and when the
+	-- kick decays to 0 the aim returns exactly to where the player was pointing.
+	-- (Applying the full offset every frame made it accumulate: shooting alone could
+	-- spin the view 180°.)
+	local appliedPitch, appliedYaw = 0, 0
+	local baseFov = BASE_FOV
 	RunService:BindToRenderStep("FpsCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
 		local cam = workspace.CurrentCamera
+		if cam.CameraType ~= Enum.CameraType.Custom then
+			appliedPitch, appliedYaw = 0, 0
+			return
+		end
 		local targetFov = adsFov or (sprinting and BASE_FOV + SPRINT_FOV_BONUS or BASE_FOV)
-		cam.FieldOfView += (targetFov - cam.FieldOfView) * math.min(1, dt * 14)
-		if fovPunch > 0.01 then
-			cam.FieldOfView += fovPunch
-			fovPunch -= fovPunch * math.min(1, dt * 18)
-		end
-		if shake > 0.01 then
-			cam.CFrame *= CFrame.Angles(math.rad((math.random() - 0.5) * shake), math.rad((math.random() - 0.5) * shake), 0)
-			shake -= shake * math.min(1, dt * 20)
-		end
+		baseFov += (targetFov - baseFov) * math.min(1, dt * 14)
+		fovPunch -= fovPunch * math.min(1, dt * 18)
+		cam.FieldOfView = baseFov + fovPunch
 
-		if math.abs(recoilPitch) > 0.001 or math.abs(recoilYaw) > 0.001 then
-			cam.CFrame *= CFrame.Angles(math.rad(recoilPitch), math.rad(recoilYaw), 0)
-			local decay = math.min(1, dt * 12)
-			recoilPitch -= recoilPitch * decay
-			recoilYaw -= recoilYaw * decay
+		-- decay recoil + shake, then build this frame's desired offset
+		local decay = math.min(1, dt * 12)
+		recoilPitch -= recoilPitch * decay
+		recoilYaw -= recoilYaw * decay
+		shake -= shake * math.min(1, dt * 20)
+		local shakeP = shake > 0.01 and (math.random() - 0.5) * shake or 0
+		local shakeY = shake > 0.01 and (math.random() - 0.5) * shake or 0
+		local desiredPitch = recoilPitch + shakeP
+		local desiredYaw = recoilYaw + shakeY
+
+		local dP, dY = desiredPitch - appliedPitch, desiredYaw - appliedYaw
+		if math.abs(dP) > 1e-4 or math.abs(dY) > 1e-4 then
+			cam.CFrame *= CFrame.Angles(math.rad(dP), math.rad(dY), 0)
 		end
+		appliedPitch, appliedYaw = desiredPitch, desiredYaw
 	end)
 end
 

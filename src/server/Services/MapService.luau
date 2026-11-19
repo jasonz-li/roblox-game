@@ -366,63 +366,58 @@ function GeometryApi.floor(name: string, minX, minZ, maxX, maxZ, y: number, colo
 	end
 end
 
--- Hollow building shell: 4 walls (thickness 1), optional floor/roof, doorway openings.
--- openings: { side = "n"|"s"|"e"|"w", from, to (world coord along the wall), height }
--- (n = min Z side, s = max Z side, w = min X side, e = max X side)
-function GeometryApi.shell(name: string, minX, minZ, maxX, maxZ, baseY: number, height: number, opts)
+-- Straight wall along an axis with openings cut out (doors and windows).
+--   axis "x": runs along X at z = at;  axis "z": runs along Z at x = at
+--   openings: { from, to (coords along the wall), height, bottom? (sill above baseY, 0 = door), glass? }
+-- Windows (bottom > 0) get a sill trim; glass = true adds a pane.
+function GeometryApi.wall(name: string, axis: string, at: number, a0: number, a1: number, baseY: number, height: number, openings, opts)
 	opts = opts or {}
 	local color = opts.color or Color3.fromRGB(150, 130, 105)
 	local material = opts.material or "Concrete"
-	local t = 1
-	local function wallRun(side, a0, a1)
-		-- build the wall run along one side with its openings cut out
-		local cuts = {}
-		for _, o in opts.openings or {} do
-			if o.side == side then
-				table.insert(cuts, o)
-			end
-		end
-		table.sort(cuts, function(p, q)
-			return p.from < q.from
-		end)
-		local cursor = a0
-		local function seg(s0, s1, y0, y1)
-			if s1 - s0 < 0.01 or y1 - y0 < 0.01 then
-				return
-			end
-			if side == "n" or side == "s" then
-				local z = side == "n" and minZ or maxZ
-				GeometryApi.box(name .. "_Wall", Vector3.new(s0, y0, z - t / 2), Vector3.new(s1, y1, z + t / 2), color, material)
-			else
-				local x = side == "w" and minX or maxX
-				GeometryApi.box(name .. "_Wall", Vector3.new(x - t / 2, y0, s0), Vector3.new(x + t / 2, y1, s1), color, material)
-			end
-		end
-		for _, o in cuts do
-			seg(cursor, o.from, baseY, baseY + height)
-			seg(o.from, o.to, baseY + (o.height or 8), baseY + height) -- lintel above the opening
-			cursor = o.to
-		end
-		seg(cursor, a1, baseY, baseY + height)
+	local t = opts.thickness or 1
+	local trimColor = opts.trimColor or Color3.fromRGB(230, 225, 210)
+	local cuts = {}
+	for _, o in openings or {} do
+		table.insert(cuts, o)
 	end
-	wallRun("n", minX, maxX)
-	wallRun("s", minX, maxX)
-	wallRun("w", minZ + t / 2, maxZ - t / 2)
-	wallRun("e", minZ + t / 2, maxZ - t / 2)
-	if opts.floor ~= false then
-		GeometryApi.floor(name .. "_Floor", minX, minZ, maxX, maxZ, baseY + 0.2, opts.floorColor or Color3.fromRGB(90, 80, 70), opts.floorMaterial or "WoodPlanks", opts.floorHoles)
+	table.sort(cuts, function(p, q)
+		return p.from < q.from
+	end)
+	local function box(s0, s1, y0, y1, depth, c, m, extra)
+		if s1 - s0 < 0.01 or y1 - y0 < 0.01 then
+			return
+		end
+		local d = depth or t
+		if axis == "x" then
+			return GeometryApi.box(name, Vector3.new(s0, y0, at - d / 2), Vector3.new(s1, y1, at + d / 2), c or color, m or material, extra)
+		else
+			return GeometryApi.box(name, Vector3.new(at - d / 2, y0, s0), Vector3.new(at + d / 2, y1, s1), c or color, m or material, extra)
+		end
 	end
-	if opts.roof ~= false then
-		GeometryApi.box(name .. "_Roof", Vector3.new(minX - 1, baseY + height, minZ - 1), Vector3.new(maxX + 1, baseY + height + 1, maxZ + 1), opts.roofColor or Color3.fromRGB(70, 60, 55), "Slate")
+	local cursor = a0
+	for _, o in cuts do
+		local bottom = o.bottom or 0
+		local top = bottom + (o.height or 8)
+		box(cursor, o.from, baseY, baseY + height)
+		box(o.from, o.to, baseY, baseY + bottom) -- wall under a window
+		box(o.from, o.to, baseY + top, baseY + height) -- lintel
+		if bottom > 0 then
+			box(o.from - 0.3, o.to + 0.3, baseY + bottom - 0.25, baseY + bottom, t + 0.6, trimColor, "SmoothPlastic") -- sill
+		end
+		if o.glass then
+			box(o.from, o.to, baseY + bottom, baseY + top, 0.2, Color3.fromRGB(150, 180, 190), "Glass", { Transparency = 0.55, Name = name .. "_Glass" })
+		end
+		cursor = o.to
 	end
+	box(cursor, a1, baseY, baseY + height)
 end
 
--- Ramp: wedge rising from `low` edge to `high` edge. dir = "n"|"s"|"e"|"w" = direction you walk to go UP.
-function GeometryApi.ramp(name: string, minX, minZ, maxX, maxZ, lowY: number, highY: number, dir: string, color: Color3?)
+-- Wedge (no foot pad). dir = direction it rises toward.
+function GeometryApi.wedge(name: string, minX, minZ, maxX, maxZ, lowY: number, highY: number, dir: string, color: Color3?, material: string?)
 	local sizeX, sizeZ = maxX - minX, maxZ - minZ
 	local rise = highY - lowY
 	local center = Vector3.new((minX + maxX) / 2, lowY + rise / 2, (minZ + maxZ) / 2)
-	-- A WedgePart rises toward its -Z (front) face. Rotate so it rises toward `dir`.
+	-- A WedgePart rises toward its local +Z; rotate so it rises toward `dir`.
 	local yaw = ({ n = 0, w = math.pi / 2, s = math.pi, e = -math.pi / 2 })[dir]
 	local length = (dir == "n" or dir == "s") and sizeZ or sizeX
 	local width = (dir == "n" or dir == "s") and sizeX or sizeZ
@@ -432,9 +427,101 @@ function GeometryApi.ramp(name: string, minX, minZ, maxX, maxZ, lowY: number, hi
 	w.Size = Vector3.new(width, rise, length)
 	w.CFrame = CFrame.new(center) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(0, math.pi, 0)
 	w.Color = color or Color3.fromRGB(120, 115, 110)
-	w.Material = Enum.Material.Concrete
+	w.Material = material and Enum.Material[material] or Enum.Material.Concrete
 	w.TopSurface = Enum.SurfaceType.Smooth
 	w.Parent = mapFolder
+	return w
+end
+
+-- Gable roof over a rectangle. ridge = "x" (ridge runs east-west) or "z".
+function GeometryApi.gableRoof(name: string, minX, minZ, maxX, maxZ, y: number, rise: number, ridge: string, color: Color3?)
+	local o = 1.2 -- overhang
+	minX, minZ, maxX, maxZ = minX - o, minZ - o, maxX + o, maxZ + o
+	color = color or Color3.fromRGB(90, 60, 50)
+	if ridge == "x" then
+		local mid = (minZ + maxZ) / 2
+		GeometryApi.wedge(name, minX, minZ, maxX, mid, y, y + rise, "s", color, "Slate")
+		GeometryApi.wedge(name, minX, mid, maxX, maxZ, y, y + rise, "n", color, "Slate")
+	else
+		local mid = (minX + maxX) / 2
+		GeometryApi.wedge(name, minX, minZ, mid, maxZ, y, y + rise, "e", color, "Slate")
+		GeometryApi.wedge(name, mid, minZ, maxX, maxZ, y, y + rise, "w", color, "Slate")
+	end
+	-- ceiling slab so the roof is solid from below
+	GeometryApi.box(name .. "_Ceiling", Vector3.new(minX + o, y - 0.4, minZ + o), Vector3.new(maxX - o, y, maxZ - o), Color3.fromRGB(200, 190, 175), "SmoothPlastic")
+end
+
+-- Hollow building: 4 walls (thickness 1) with doors/windows, floor, roof.
+--   openings: { side = "n"|"s"|"e"|"w", from, to, height, bottom?, glass? }
+--   (n = min Z side, s = max Z side, w = min X side, e = max X side)
+--   opts: color, material, skip = {"w"} (shared walls), floor = false, floorHoles,
+--         roof = false | "flat" (default) | "gable", ridge = "x"|"z", rise, parapet = height
+function GeometryApi.shell(name: string, minX, minZ, maxX, maxZ, baseY: number, height: number, opts)
+	opts = opts or {}
+	local t = 1
+	local skip = {}
+	for _, s in opts.skip or {} do
+		skip[s] = true
+	end
+	local per = { n = {}, s = {}, e = {}, w = {} }
+	for _, o in opts.openings or {} do
+		table.insert(per[o.side], o)
+	end
+	local wallOpts = { color = opts.color or Color3.fromRGB(150, 130, 105), material = opts.material or "Concrete", trimColor = opts.trimColor }
+	if not skip.n then
+		GeometryApi.wall(name .. "_Wall", "x", minZ, minX, maxX, baseY, height, per.n, wallOpts)
+	end
+	if not skip.s then
+		GeometryApi.wall(name .. "_Wall", "x", maxZ, minX, maxX, baseY, height, per.s, wallOpts)
+	end
+	if not skip.w then
+		GeometryApi.wall(name .. "_Wall", "z", minX, minZ + t / 2, maxZ - t / 2, baseY, height, per.w, wallOpts)
+	end
+	if not skip.e then
+		GeometryApi.wall(name .. "_Wall", "z", maxX, minZ + t / 2, maxZ - t / 2, baseY, height, per.e, wallOpts)
+	end
+	if opts.floor ~= false then
+		GeometryApi.floor(name .. "_Floor", minX, minZ, maxX, maxZ, baseY + 0.2, opts.floorColor or Color3.fromRGB(90, 80, 70), opts.floorMaterial or "WoodPlanks", opts.floorHoles)
+	end
+	local roofColor = opts.roofColor or Color3.fromRGB(70, 60, 55)
+	if opts.roof == "gable" then
+		GeometryApi.gableRoof(name .. "_Roof", minX, minZ, maxX, maxZ, baseY + height, opts.rise or 6, opts.ridge or "x", roofColor)
+	elseif opts.roof ~= false then
+		GeometryApi.box(name .. "_Roof", Vector3.new(minX - 0.5, baseY + height, minZ - 0.5), Vector3.new(maxX + 0.5, baseY + height + 1, maxZ + 0.5), roofColor, "Slate")
+		if opts.parapet then
+			local p, y0 = opts.parapet, baseY + height + 1
+			local c = opts.color or Color3.fromRGB(150, 130, 105)
+			GeometryApi.box(name .. "_Parapet", Vector3.new(minX - 0.5, y0, minZ - 0.5), Vector3.new(maxX + 0.5, y0 + p, minZ + 0.5), c, opts.material)
+			GeometryApi.box(name .. "_Parapet", Vector3.new(minX - 0.5, y0, maxZ - 0.5), Vector3.new(maxX + 0.5, y0 + p, maxZ + 0.5), c, opts.material)
+			GeometryApi.box(name .. "_Parapet", Vector3.new(minX - 0.5, y0, minZ + 0.5), Vector3.new(minX + 0.5, y0 + p, maxZ - 0.5), c, opts.material)
+			GeometryApi.box(name .. "_Parapet", Vector3.new(maxX - 0.5, y0, minZ + 0.5), Vector3.new(maxX + 0.5, y0 + p, maxZ - 0.5), c, opts.material)
+		end
+	end
+end
+
+-- Evenly spaced windows along a wall span, skipping any that overlap `avoid` ranges.
+function GeometryApi.windowRow(side: string, from: number, to: number, count: number, width: number, bottom: number, height: number, avoid)
+	local list = {}
+	local step = (to - from) / count
+	for i = 0, count - 1 do
+		local c = from + step * (i + 0.5)
+		local w0, w1 = c - width / 2, c + width / 2
+		local ok = true
+		for _, a in avoid or {} do
+			if w1 > a[1] - 1 and w0 < a[2] + 1 then
+				ok = false
+			end
+		end
+		if ok then
+			table.insert(list, { side = side, from = w0, to = w1, bottom = bottom, height = height, glass = true })
+		end
+	end
+	return list
+end
+
+-- Ramp: wedge rising from `low` edge to `high` edge. dir = "n"|"s"|"e"|"w" = direction you walk to go UP.
+function GeometryApi.ramp(name: string, minX, minZ, maxX, maxZ, lowY: number, highY: number, dir: string, color: Color3?)
+	local w = GeometryApi.wedge(name, minX, minZ, maxX, maxZ, lowY, highY, dir, color, "Concrete")
 
 	-- Flat pad across the ramp's bottom edge. Without it, Roblox pathfinding treats the
 	-- wedge's zero-thickness low edge as disconnected from the floor (verified in Studio).

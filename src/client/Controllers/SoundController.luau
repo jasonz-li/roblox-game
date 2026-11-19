@@ -81,7 +81,68 @@ function SoundController.Init()
 	worldFolder.Parent = workspace
 end
 
+-- DEV sound audition: F6 = next gunshot recording, F7 = toggle the low "thump" layer.
+-- Only changes sounds on this client; copy the winner into SoundConfig.RifleShot.Ids.
+SoundController.ThumpEnabled = true
+local auditionIndex = 0
+local function auditionLabel(text: string)
+	local pg = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+	local gui = pg:FindFirstChild("SoundAudition")
+	if not gui then
+		gui = Instance.new("ScreenGui")
+		gui.Name = "SoundAudition"
+		gui.ResetOnSpawn = false
+		gui.Parent = pg
+		local l = Instance.new("TextLabel")
+		l.Name = "Label"
+		l.AnchorPoint = Vector2.new(0.5, 0)
+		l.Position = UDim2.new(0.5, 0, 0, 120)
+		l.Size = UDim2.fromOffset(700, 30)
+		l.BackgroundTransparency = 0.4
+		l.BackgroundColor3 = Color3.new(0, 0, 0)
+		l.TextColor3 = Color3.fromRGB(255, 230, 120)
+		l.Font = Enum.Font.GothamBold
+		l.TextSize = 18
+		l.Parent = gui
+	end
+	local l = gui.Label
+	l.Text = text
+	l.Visible = true
+	local stamp = os.clock()
+	l:SetAttribute("Stamp", stamp)
+	task.delay(4, function()
+		if l:GetAttribute("Stamp") == stamp then
+			l.Visible = false
+		end
+	end)
+end
+
+local function setGunshot(id: string)
+	for _, key in { "RifleShot", "HeavyShot" } do
+		for _, s in templates[key] or {} do
+			s.SoundId = id
+		end
+	end
+end
+
 function SoundController.Start()
+	local GunshotCandidates = require(game.ReplicatedStorage.Shared.Config.GunshotCandidates)
+	game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
+		if processed then
+			return
+		end
+		if input.KeyCode == Enum.KeyCode.F6 then
+			auditionIndex = auditionIndex % #GunshotCandidates + 1
+			local c = GunshotCandidates[auditionIndex]
+			setGunshot(c.Id)
+			auditionLabel(string.format("Gunshot %d/%d: %s   (F6 next, F7 thump %s)", auditionIndex, #GunshotCandidates, c.Name, SoundController.ThumpEnabled and "ON" or "OFF"))
+			SoundController.Play("RifleShot")
+		elseif input.KeyCode == Enum.KeyCode.F7 then
+			SoundController.ThumpEnabled = not SoundController.ThumpEnabled
+			auditionLabel("Thump layer " .. (SoundController.ThumpEnabled and "ON" or "OFF"))
+		end
+	end)
+
 	Remotes.Get("ShotFx").OnClientEvent:Connect(function(_shooter, origin, _endPos, weaponId, upgraded)
 		if typeof(origin) ~= "Vector3" then
 			return

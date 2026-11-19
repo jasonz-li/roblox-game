@@ -284,7 +284,9 @@ local function fire(hum, char)
 	fireRemote:FireServer(origin, directions, claims)
 
 	SoundController.Play(stats.ShotSound, 1, stats.ShotPitch)
-	SoundController.Play("ShotThump", stats.Pellets > 1 and 1.6 or 1, 0.6 * stats.ShotPitch)
+	if SoundController.ThumpEnabled then
+		SoundController.Play("ShotThump", stats.Pellets > 1 and 1.6 or 1, 0.6 * stats.ShotPitch)
+	end
 	CameraController.Shake(0.25 + stats.RecoilKick * 0.15)
 	flash.Transparency = 0.1
 	flash.Size = Vector3.one * (0.4 + math.random() * 0.35) * (stats.Pellets > 1 and 1.6 or 1)

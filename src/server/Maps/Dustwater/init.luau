@@ -80,8 +80,8 @@ return {
 	},
 
 	WallBuys = {
-		{ Weapon = "Pistol", Pos = V(-34.7, 5, 128), Face = V(1, 0, 0) },
-		{ Weapon = "SMG", Pos = V(34.7, 5, 130), Face = V(-1, 0, 0) },
+		{ Weapon = "Pistol", Pos = V(-34.3, 5, 128), Face = V(1, 0, 0) },
+		{ Weapon = "SMG", Pos = V(34.3, 5, 130), Face = V(-1, 0, 0) },
 		{ Weapon = "Shotgun", Pos = V(-60, 5, -39.7), Face = V(0, 0, 1) },
 		{ Weapon = "AssaultRifle", Pos = V(-238, 5, 54.3), Face = V(0, 0, -1) },
 		{ Weapon = "Sniper", Pos = V(190, 17, -79.7), Face = V(0, 0, 1) },
