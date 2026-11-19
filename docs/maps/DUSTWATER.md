@@ -1,86 +1,70 @@
 # Map: Dustwater (working title)
 
 An original, compact, destroyed desert town for 1–4 players. It has the feel of
-classic round-based zombie maps (tight start, an open fighting street, interiors
-you buy into, a hidden upgrade room), but its own layout and landmarks. **No
-geometry, buildings or assets copied from any existing game.**
+classic round-based zombie maps (a tight start, an open fighting street,
+interiors you buy into, a hidden upgrade room), but its own layout and
+landmarks. **No geometry, buildings or assets copied from any existing game.**
 
-Scale reference: Roblox character ≈ 5 studs tall · door 4×7 · street 32–36 wide ·
-small building footprint 30×40.
+Scale reference: Roblox character ≈ 5 studs tall · door 4×7 · Main Street 36
+road + sidewalks · whole town ≈ 560 × 340 studs (layout v2).
 
-## Top-down layout (north ↑, ~1 char = 8 studs)
+## Top-down layout, v2 (north ↑)
 
 ```
-                                   N
-   +-----------------------------------------------------------------------------------+
-   |  dunes / rock wall boundary                                                        |
-   |   +-----------+                                         +-------------------------+ |
-   |   | GAS       |  [canopy + pumps]                       |  MOTEL (U-shaped,       | |
-   |   | STATION   |                 MAIN STREET              |  2 floors, balcony)    | |
-   |   | store +   |  =====================================  |  office | rooms | rooms | |
-   |   | garage    |  ===  wrecked cars  ===  bus  =========  |      courtyard + pool  | |
-   |   +----D2-----+   ||                    ||       D4 gate |   (storm drain → D5)    | |
-   |                   ||   +---------+      ||               +-------------------------+ |
-   |   burned field    ||   | DINER   |  fallen water tower                               |
-   |                   ||   | D3      |  (landmark)          alley ─────────┐            |
-   |                   ||   +---------+      ||                             │            |
-   |                   ++=========D1=========++ ← debris barricade          │            |
-   |                          ELM LANE (start)                               │            |
-   |                   house  |  cul-de-sac  |  house + garage               │            |
-   |                          +-------------+                                │            |
-   +-----------------------------------------------------------------------------------+
-                UNDERGROUND (below Main Street): storm tunnel → lab room (Spirit Forge)
+ z=-112 +=================================== cliff =============================================+
+        | GAS STATION   |A1|  ALLEY ─── dumpsters ─── sewer ramp ↓ (D6)   |                        |
+        |  canopy pumps |  |pass| A2 shops |  DINER   |  C: theater      |  MOTEL north wing 2F   |
+ z=-40  |  store garage |  D3b                 D3                         |  balcony ── stairs     |
+        |           D2  |======== MAIN STREET (water tower, bus, cars) ===| D4  courtyard  pool    |
+ z=12   |               |  BURNED FIELD  | lane |    JUNKYARD            |   pump-house (D5 ↓)    |
+        |          D2b  |                |      |                    D4b |  office    south wing  |
+ z=90   +---------------+-----------------D1-----------------------------+------------------------+
+                         |  ELM LANE (start): 2 houses, shed, garage,    |
+                         |  loop road around a center island             |
+ z=225                   +-----------------------------------------------+
+       x=-260        x=-150                 x≈0                      x=170                    x=300
+
+ Underground (y = -20):  motel ramp → landing → long tunnel west → LAB (under the diner) → sewer ramp up into the alley
 ```
 
 ## Areas and progression
 
-| # | Area | Unlock | Feel | Contents |
-|---|---|---|---|---|
-| 0 | **Elm Lane** (start) | — | Narrow residential cul-de-sac, 2 burned houses (enterable ground floors), broken fences | Wall-buys: Pistol, SMG · Box spawn 1 (garage) · 3 boarded-window enemy entries |
-| 1 | **Main Street** | D1 debris barricade, 750 | The open fight space: wide road, wrecked cars and bus for cover, fallen water tower blocking half the street | Wall-buy: Shotgun · Perk: Swift Step · Box spawn 2 · 5 entries (alley, rooftops, storm drains) · **boss arena** |
-| 2 | **Gas Station** | D2 car-wreck barricade, 1000 | Canopy and pumps outside, small store and a garage bay inside | Wall-buy: Assault Rifle · Perk: Rapid Fire (garage) · 3 entries |
-| 3 | **Diner** | D3 front door, 1000 | Tight interior: booths, counter, kitchen, back door to the alley | Perk: Quick Hands · Box spawn 3 · 2 window entries + kitchen door |
-| 4 | **Motel** | D4 courtyard gate, 1250 | U-shaped 2-floor motel, outdoor stairs, upper balcony, drained pool | Wall-buy: Sniper (balcony) · Perk: Iron Body (office) · Box spawn 4 (a room) · 4 entries |
-| 5 | **Underground lab** | D5 storm-drain hatch in the motel courtyard, 1500 | Concrete tunnel → small hidden lab under Main Street | **Spirit Forge** (upgrade station) · 1 tunnel entry |
+| # | Area | Ways in | Contents |
+|---|---|---|---|
+| 0 | **Elm Lane** (start) | — | Houses you can run around (the west house has front and back doors), a shed, garage, loop road · Pistol and SMG wall-buys · Box 1 (garage) · 5 enemy spawns |
+| 1 | **Main Street + Burned Field + Junkyard** | D1 debris barricade, 750 | The big fighting space: street with the fallen water tower, bus, cars; a burned field with dead trees (west) and a junkyard with containers (east) · Shotgun wall-buy · Swift Step · Box 2 (junkyard) · 7 spawns · **boss arena** |
+| 2 | **Gas Station** | D2 wreck pile (street) **or** D2b back gate (field), 1000 | Canopy and pumps, store with front and back doors, garage bay · Assault Rifle wall-buy · Rapid Fire · Box 5 (behind the store) · 4 spawns |
+| 3 | **Diner + Alley** | D3 diner door **or** D3b alley gate, 1000 | Diner interior (counter, booths), kitchen door to the back alley, alley passage back to Main Street · Quick Hands · Box 3 · 3 spawns |
+| 4 | **Motel** | D4 front gate (street) **or** D4b back gate (junkyard), 1250 | U-shaped courtyard, drained pool, office, a room, 2nd-floor balcony and stairs · Sniper wall-buy (balcony) · Iron Body · Box 4 · 4 spawns |
+| 5 | **Storm Drain Lab** | D5 pump-house (motel) **or** D6 sewer grate (alley), 1500 | Ramp, landing, long tunnel, lab · **Spirit Forge** · 4 spawns |
 
-## Design notes
+## Loops (where you can run circles)
 
-- **Loops, not dead ends.** Main Street ↔ alley ↔ diner back door, and Main
-  Street ↔ motel ↔ storm tunnel, give players routes to kite (train) enemies.
-- **Enemy entry points are boarded windows and gaps**, spread around every area,
-  so enemies always come from several sides. Each zone's entries only activate
-  once that zone is unlocked.
-- **The boss arena is Main Street:** the largest open space, plenty of cover,
-  three exits.
-- **Bounds:** rock walls, dunes and invisible walls around the edge. Every
-  walkable surface sits on solid floors, so nothing falls through the world.
-- **Landmarks for orientation:** the fallen water tower (center), the gas
-  station canopy (west), the motel sign (east).
+1. **Elm Lane:** around each house, through the west house, around the center island.
+2. **Main → diner → alley → passage → Main**, once D3 and D3b are open.
+3. **Main → gas station → back gate → field → Main**, once D2 and D2b are open.
+4. **Main → motel → back gate → junkyard → Main**, once D4 and D4b are open.
+5. **The big underground loop:** motel → drain → tunnel → lab → sewer → alley → Main → motel.
 
-## Build stages (your plan)
+## Build stages
 
-1. ✅ **Greybox** (2026-11-19): roads, building blocks, boundaries, door and
-   station positions. Playable with the current systems. Code:
-   `src/server/Maps/Dustwater/`. Verified that zombies can path between every
-   area (with doors open), that the drain ramp and balcony stairs slope
-   correctly, and that the game runs without errors.
+1. ✅ **Greybox v1** (2026-11-19). **v2** (same day) after feedback: bigger and
+   more spread out, more loops, empty lots filled. Verified 13 walking routes
+   between every area, including Elm Lane all the way to the lab (doors treated
+   as open).
 2. **Architecture:** real walls with openings, interiors, the motel's second
-   floor and stairs, roofs.
-3. **Environment:** debris, wrecked vehicles, cracked roads, fire and smoke
-   (particles), dusk or night lighting.
-4. **Gameplay:** spawn and entry points, navmesh checks, doors and stations
-   wired in, boarded windows (zombies tear boards off, players rebuild them
-   for points).
-5. **Polish:** materials and textures, small details, atmosphere, performance
-   pass (part count, streaming).
+   floor, roofs.
+3. **Environment:** debris, wrecked vehicles, cracked roads, fire and smoke,
+   lighting.
+4. **Gameplay:** boarded windows (zombies tear boards off, players rebuild them
+   for points), spawn tuning, boss arena setup.
+5. **Polish:** materials, small details, atmosphere, performance.
 
-## Tech plan
+## Tech notes
 
-- New layout module `src/server/Maps/Dustwater/`, one builder file per area
-  (`ElmLane.luau`, `MainStreet.luau`, …) plus `init.luau`. Each builder returns
-  the same data the services already use: zones, doors, wall-buys, perks,
-  forge, box locations and spawns. Splitting by area keeps files reviewable.
-- `MapService` loads a map by name, so the old blockout stays available as a
-  test map.
-- Geometry is built at runtime in Stages 1–2 so it's tracked in git. Once art
-  is involved, we can move to a `.rbxm` model synced by Rojo.
+- Code: `src/server/Maps/Dustwater/init.luau` (layout data: zones, walls,
+  doors, stations, spawns, lighting) and `Geometry.luau` (greybox builders).
+- `MapService` provides the geometry API: `box`, `floor` (with holes), `shell`
+  (hollow building with doorways), `ramp`, `part`.
+- **Gotcha:** Roblox pathfinding doesn't connect a WedgePart's thin bottom edge
+  to the floor, so `ramp()` always adds a flat foot pad at the bottom.

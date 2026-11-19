@@ -435,6 +435,20 @@ function GeometryApi.ramp(name: string, minX, minZ, maxX, maxZ, lowY: number, hi
 	w.Material = Enum.Material.Concrete
 	w.TopSurface = Enum.SurfaceType.Smooth
 	w.Parent = mapFolder
+
+	-- Flat pad across the ramp's bottom edge. Without it, Roblox pathfinding treats the
+	-- wedge's zero-thickness low edge as disconnected from the floor (verified in Studio).
+	local padMin, padMax
+	if dir == "s" then
+		padMin, padMax = Vector3.new(minX, lowY - 0.6, minZ - 3), Vector3.new(maxX, lowY + 0.2, minZ + 4)
+	elseif dir == "n" then
+		padMin, padMax = Vector3.new(minX, lowY - 0.6, maxZ - 4), Vector3.new(maxX, lowY + 0.2, maxZ + 3)
+	elseif dir == "w" then
+		padMin, padMax = Vector3.new(maxX - 4, lowY - 0.6, minZ), Vector3.new(maxX + 3, lowY + 0.2, maxZ)
+	else
+		padMin, padMax = Vector3.new(minX - 3, lowY - 0.6, minZ), Vector3.new(minX + 4, lowY + 0.2, maxZ)
+	end
+	GeometryApi.box(name .. "_FootPad", padMin, padMax, color or Color3.fromRGB(120, 115, 110), "Concrete")
 	return w
 end
 
