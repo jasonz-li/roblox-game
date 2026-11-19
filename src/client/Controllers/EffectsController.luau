@@ -130,7 +130,40 @@ function EffectsController.Init()
 	fxFolder.Parent = workspace
 end
 
+-- Flicker every PointLight tagged "Flicker" (fires, broken lights). Client-only, ~20 Hz.
+local function startFlicker()
+	local CollectionService = game:GetService("CollectionService")
+	local lights = {}
+	local function add(l)
+		if l:IsA("PointLight") or l:IsA("SpotLight") then
+			lights[l] = { base = l.Brightness, seed = math.random() * 100 }
+		end
+	end
+	for _, l in CollectionService:GetTagged("Flicker") do
+		add(l)
+	end
+	CollectionService:GetInstanceAddedSignal("Flicker"):Connect(add)
+	CollectionService:GetInstanceRemovedSignal("Flicker"):Connect(function(l)
+		lights[l] = nil
+	end)
+	task.spawn(function()
+		while true do
+			local t = os.clock()
+			for l, info in lights do
+				if l.Parent then
+					local n = math.noise(t * 6, info.seed) -- -0.5..0.5-ish
+					l.Brightness = info.base * (0.8 + n * 0.7)
+				else
+					lights[l] = nil
+				end
+			end
+			task.wait(0.05)
+		end
+	end)
+end
+
 function EffectsController.Start()
+	startFlicker()
 	Remotes.Get("ShotFx").OnClientEvent:Connect(function(_shooter, origin, endPos, weaponId, upgraded)
 		if typeof(origin) == "Vector3" and typeof(endPos) == "Vector3" then
 			local stats = typeof(weaponId) == "string" and WeaponConfig.Get(weaponId, upgraded == true)

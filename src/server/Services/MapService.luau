@@ -305,6 +305,28 @@ local function setAtmosphere()
 	for k, v in Layout.Lighting or {} do
 		Lighting[k] = v
 	end
+	-- Post-processing: Atmosphere haze, color grade, bloom (per map)
+	local fx = Layout.PostFX
+	if fx then
+		local function ensure(className, name)
+			local inst = Lighting:FindFirstChild(name) or Lighting:FindFirstChildOfClass(className)
+			if not inst then
+				inst = Instance.new(className)
+				inst.Name = name
+				inst.Parent = Lighting
+			end
+			return inst
+		end
+		for prop, v in fx.Atmosphere or {} do
+			ensure("Atmosphere", "Atmosphere")[prop] = v
+		end
+		for prop, v in fx.ColorCorrection or {} do
+			ensure("ColorCorrectionEffect", "MapColorGrade")[prop] = v
+		end
+		for prop, v in fx.Bloom or {} do
+			ensure("BloomEffect", "Bloom")[prop] = v
+		end
+	end
 end
 
 ----------------------------------------------------------------------

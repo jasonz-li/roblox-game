@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local CameraController = {}
+CameraController.AllowScripted = false -- set true for future cutscenes / death cams
 
 local BASE_FOV = 78
 local SPRINT_FOV_BONUS = 6
@@ -88,12 +89,28 @@ function CameraController.Start()
 	-- spin the view 180°.)
 	local appliedPitch, appliedYaw = 0, 0
 	local baseFov = BASE_FOV
+	local notCustomSince = nil
 	RunService:BindToRenderStep("FpsCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
 		local cam = workspace.CurrentCamera
 		if cam.CameraType ~= Enum.CameraType.Custom then
 			appliedPitch, appliedYaw = 0, 0
+			-- Self-heal: the game never uses a scripted camera (no cutscenes yet). If something
+			-- (e.g. a Studio screenshot tool) leaves it Scriptable, the mouse stops turning the
+			-- view. Restore after 0.5s unless a feature opts in via CameraController.AllowScripted.
+			if not CameraController.AllowScripted then
+				notCustomSince = notCustomSince or os.clock()
+				if os.clock() - notCustomSince > 0.5 then
+					cam.CameraType = Enum.CameraType.Custom
+					local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+					if hum then
+						cam.CameraSubject = hum
+					end
+					notCustomSince = nil
+				end
+			end
 			return
 		end
+		notCustomSince = nil
 		local targetFov = adsFov or (sprinting and BASE_FOV + SPRINT_FOV_BONUS or BASE_FOV)
 		baseFov += (targetFov - baseFov) * math.min(1, dt * 14)
 		fovPunch -= fovPunch * math.min(1, dt * 18)

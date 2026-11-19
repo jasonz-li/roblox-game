@@ -118,7 +118,15 @@ return {
 		{ Zone = 5, Pos = V(150, -20, -70) }, { Zone = 5, Pos = V(45, -20, -60) }, { Zone = 5, Pos = V(0, -20, -60) }, { Zone = 5, Pos = V(-10, -20, -80) },
 	},
 
+	-- Stage 3 post-processing (MapService applies these to Lighting)
+	PostFX = {
+		Atmosphere = { Density = 0.38, Offset = 0.1, Haze = 2.2, Glare = 0.4, Color = Color3.fromRGB(190, 140, 100), Decay = Color3.fromRGB(110, 70, 50) },
+		ColorCorrection = { Brightness = 0.03, Contrast = 0.12, Saturation = -0.15, TintColor = Color3.fromRGB(255, 232, 214) },
+		Bloom = { Intensity = 0.6, Size = 28, Threshold = 1.6 },
+	},
+
 	BuildGeometry = function(api)
-		require(script.Geometry)(api)
+		require(script.Geometry)(api) -- Stage 2 architecture
+		require(script.Environment)(api) -- Stage 3 destruction, fire, smoke, debris
 	end,
 }
