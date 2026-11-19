@@ -85,6 +85,7 @@ end
 -- Only changes sounds on this client; copy the winner into SoundConfig.RifleShot.Ids.
 SoundController.ThumpEnabled = true
 local auditionIndex = 0
+local repairIndex = 0
 local function auditionLabel(text: string)
 	local pg = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 	local gui = pg:FindFirstChild("SoundAudition")
@@ -140,6 +141,26 @@ function SoundController.Start()
 		elseif input.KeyCode == Enum.KeyCode.F7 then
 			SoundController.ThumpEnabled = not SoundController.ThumpEnabled
 			auditionLabel("Thump layer " .. (SoundController.ThumpEnabled and "ON" or "OFF"))
+		elseif input.KeyCode == Enum.KeyCode.F8 then
+			-- Preview window-repair sounds at the real rhythm (3 boards). Preview only:
+			-- the server keeps using SoundConfig.BoardRepair until you pick one.
+			local RepairCandidates = require(game.ReplicatedStorage.Shared.Config.RepairCandidates)
+			local GameConfig = require(game.ReplicatedStorage.Shared.Config.GameConfig)
+			repairIndex = repairIndex % #RepairCandidates + 1
+			local c = RepairCandidates[repairIndex]
+			auditionLabel(string.format("Repair sound %d/%d: %s   (F8 next)", repairIndex, #RepairCandidates, c.Name))
+			task.spawn(function()
+				for _ = 1, 3 do
+					local s = Instance.new("Sound")
+					s.SoundId = c.Id
+					s.Volume = SoundConfig.BoardRepair.Volume
+					s.PlaybackSpeed = 1 + (math.random() * 2 - 1) * 0.08
+					s.Parent = game:GetService("SoundService")
+					s:Play()
+					game:GetService("Debris"):AddItem(s, 3)
+					task.wait(GameConfig.Barrier.RepairInterval)
+				end
+			end)
 		end
 	end)
 

@@ -42,9 +42,8 @@ local function refreshPrompt(barrier: BasePart)
 	end
 	local boards, max = barrier:GetAttribute("Boards"), barrier:GetAttribute("MaxBoards")
 	prompt.Enabled = boards < max
-	prompt.ActionText = "Repair window"
+	prompt.ActionText = "Hold to repair"
 	prompt.ObjectText = string.format("%d / %d boards", boards, max)
-	prompt.HoldDuration = cfg.RepairHold
 end
 
 local function boardPart(barrier: BasePart, n: number): BasePart?
@@ -106,6 +105,42 @@ function BarrierService.Repair(player: Player, barrier: BasePart)
 	end
 end
 
+-- Hold-to-repair: while a player holds E on the prompt, rebuild one board every
+-- RepairInterval until they let go, walk away, go down, or the window is full.
+local repairing = {} -- [Player] = token
+local function canKeepRepairing(player: Player, barrier: BasePart, prompt: ProximityPrompt): boolean
+	if not barrier.Parent or not player.Parent then
+		return false
+	end
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not hum or hum.Health <= 0 or not root then
+		return false
+	end
+	if (root.Position - barrier.Position).Magnitude > prompt.MaxActivationDistance + 4 then
+		return false
+	end
+	return (barrier:GetAttribute("Boards") or 0) < (barrier:GetAttribute("MaxBoards") or 0)
+end
+
+local function startRepair(player: Player, barrier: BasePart, prompt: ProximityPrompt)
+	local token = {}
+	repairing[player] = token
+	task.spawn(function()
+		while repairing[player] == token do
+			task.wait(cfg.RepairInterval)
+			if repairing[player] ~= token or not canKeepRepairing(player, barrier, prompt) then
+				break
+			end
+			BarrierService.Repair(player, barrier)
+		end
+		if repairing[player] == token then
+			repairing[player] = nil
+		end
+	end)
+end
+
 -- Fresh boards on every window (match reset rebuilds the map anyway; this also
 -- fixes up barriers that appear later via the tag signal).
 local function setup(barrier: BasePart)
@@ -115,11 +150,23 @@ local function setup(barrier: BasePart)
 	-- InteractionService adds the prompt when it sees the "Interactable" tag; wait for it.
 	task.defer(function()
 		local prompt = barrier:WaitForChild("ProximityPrompt", 5)
-		if prompt then
-			prompt.KeyboardKeyCode = Enum.KeyCode.E
-			prompt.MaxActivationDistance = 7
-			refreshPrompt(barrier)
+		if not prompt then
+			return
 		end
+		prompt.KeyboardKeyCode = Enum.KeyCode.E
+		prompt.MaxActivationDistance = 7
+		-- The fill ring roughly matches a full repair from empty; the actual repairs are
+		-- driven by the hold loop below (Triggered does nothing for barriers).
+		prompt.HoldDuration = cfg.Boards * cfg.RepairInterval
+		prompt.PromptButtonHoldBegan:Connect(function(player)
+			if canKeepRepairing(player, barrier, prompt) then
+				startRepair(player, barrier, prompt)
+			end
+		end)
+		prompt.PromptButtonHoldEnded:Connect(function(player)
+			repairing[player] = nil
+		end)
+		refreshPrompt(barrier)
 	end)
 end
 
@@ -134,6 +181,7 @@ function BarrierService.Start()
 	end
 	Players.PlayerRemoving:Connect(function(p)
 		repairEarned[p] = nil
+		repairing[p] = nil
 	end)
 end
 

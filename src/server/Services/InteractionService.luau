@@ -108,9 +108,11 @@ function handlers.Forge(player: Player, _part: BasePart)
 	message(player, "Forged: " .. WeaponConfig.Get(w.id, true).DisplayName, "good")
 end
 
-function handlers.Barrier(player: Player, part: BasePart)
-	BarrierService.Repair(player, part)
+function handlers.Barrier(_player: Player, _part: BasePart)
+	-- Repairs are continuous while E is held (BarrierService hold loop), so the
+	-- prompt's Triggered event at the end of the ring does nothing extra.
 end
+local _ = BarrierService
 
 function handlers.MysteryBox(player: Player, _part: BasePart)
 	local ok, reason = MysteryBoxService.OnTriggered(player)
