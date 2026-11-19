@@ -555,6 +555,17 @@ function EnemyService.Init()
 	PhysicsService:CollisionGroupSetCollidable("Corpses", "Players", false)
 	PhysicsService:CollisionGroupSetCollidable("Corpses", "Enemies", false)
 	PhysicsService:CollisionGroupSetCollidable("Corpses", "Corpses", false)
+	-- Zombies pass through each other: they crowd into a horde instead of climbing
+	-- onto each other's heads (which made some "float" in the air).
+	PhysicsService:CollisionGroupSetCollidable("Enemies", "Enemies", false)
+	-- Player-only blocking volumes (stop players climbing over walls/roofs to skip doors)
+	if not PhysicsService:IsCollisionGroupRegistered("PlayerClip") then
+		PhysicsService:RegisterCollisionGroup("PlayerClip")
+	end
+	for _, g in { "Enemies", "Corpses", "Default" } do
+		PhysicsService:CollisionGroupSetCollidable("PlayerClip", g, false)
+	end
+	PhysicsService:CollisionGroupSetCollidable("PlayerClip", "Players", true)
 
 	local existing = workspace:FindFirstChild("Enemies")
 	if existing then

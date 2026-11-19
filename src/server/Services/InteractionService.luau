@@ -163,23 +163,19 @@ local function onInteractable(part: Instance)
 		return
 	end
 	local kind = part:GetAttribute("Kind")
-	local prompt = Instance.new("ProximityPrompt")
 	local action, object = promptTexts(part)
-	prompt.ActionText = action
-	prompt.ObjectText = object
-	prompt.KeyboardKeyCode = Enum.KeyCode.E
-	prompt.HoldDuration = (kind == "Door" or kind == "Forge") and 0.4 or 0
-	prompt.MaxActivationDistance = kind == "Door" and 11 or 8
-	prompt.RequiresLineOfSight = false
-	prompt.Parent = part
 
-	prompt.Triggered:Connect(function(player: Player)
+	local function onTriggered(player: Player, prompt: ProximityPrompt)
 		local now = os.clock()
 		if now - (lastUse[player] or 0) < GameConfig.InteractCooldown then
 			return
 		end
 		lastUse[player] = now
-		if not PlayerService.IsAlive(player) or not part.Parent then
+		-- A door being opened loses its tag first: stops a second purchase from another prompt
+		if not part.Parent or not CollectionService:HasTag(part, "Interactable") then
+			return
+		end
+		if not PlayerService.IsAlive(player) then
 			return
 		end
 		local root = player.Character.HumanoidRootPart
@@ -192,7 +188,42 @@ local function onInteractable(part: Instance)
 		if handler then
 			handler(player, part)
 		end
-	end)
+	end
+
+	local function makePrompt(host: Instance)
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.ActionText = action
+		prompt.ObjectText = object
+		prompt.KeyboardKeyCode = Enum.KeyCode.E
+		prompt.HoldDuration = kind == "Forge" and 0.4 or 0 -- doors buy instantly now
+		prompt.MaxActivationDistance = kind == "Door" and 9 or 8
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = host
+		prompt.Triggered:Connect(function(player)
+			onTriggered(player, prompt)
+		end)
+		return prompt
+	end
+
+	-- The main prompt lives on the part itself (other services find it there)...
+	makePrompt(part)
+	-- ...and wide doors get extra prompts every ~8 studs along their width, so you can
+	-- buy them from wherever you stand (only the nearest one shows).
+	if kind == "Door" then
+		local width = math.max(part.Size.X, part.Size.Z)
+		local alongX = part.Size.X >= part.Size.Z
+		local count = math.floor(width / 8)
+		for i = 1, count do
+			local offset = -width / 2 + (i - 0.5) * (width / count)
+			if math.abs(offset) > 2 then -- the center already has the main prompt
+				local att = Instance.new("Attachment")
+				att.Name = "PromptPoint"
+				att.Position = Vector3.new(alongX and offset or 0, -part.Size.Y / 2 + 4, alongX and 0 or offset)
+				att.Parent = part
+				makePrompt(att)
+			end
+		end
+	end
 end
 
 function InteractionService.Init()
@@ -206,9 +237,10 @@ function InteractionService.Start()
 		onInteractable(part)
 	end
 	CollectionService:GetInstanceRemovedSignal("Interactable"):Connect(function(part)
-		local prompt = part:FindFirstChildOfClass("ProximityPrompt")
-		if prompt then
-			prompt:Destroy()
+		for _, d in part:GetDescendants() do
+			if d:IsA("ProximityPrompt") then
+				d:Destroy()
+			end
 		end
 	end)
 end

@@ -42,7 +42,32 @@ local exhausted = false
 local lastSprintAt = 0
 
 -- Knife
-local KNIFE_TIME = 0.32
+local KNIFE_TIME = 0.42
+
+-- Knife keyframes (camera space). Blade points along the knife's -Z.
+local KNIFE_KEYS = {
+	{ t = 0.0, cf = CFrame.new(1.25, -1.5, -1.2) * CFrame.Angles(math.rad(-20), math.rad(35), math.rad(-60)) }, -- offscreen low right
+	{ t = 0.22, cf = CFrame.new(0.95, 0.15, -1.55) * CFrame.Angles(math.rad(15), math.rad(55), math.rad(-105)) }, -- wind-up, raised right
+	{ t = 0.5, cf = CFrame.new(-0.8, -0.6, -1.6) * CFrame.Angles(math.rad(-25), math.rad(-50), math.rad(-70)) }, -- slash end, low left
+	{ t = 1.0, cf = CFrame.new(-1.3, -1.7, -1.0) * CFrame.Angles(math.rad(-45), math.rad(-70), math.rad(-45)) }, -- follow-through offscreen
+}
+local function knifePose(t: number): CFrame
+	for i = 1, #KNIFE_KEYS - 1 do
+		local a, b = KNIFE_KEYS[i], KNIFE_KEYS[i + 1]
+		if t <= b.t then
+			local u = (t - a.t) / (b.t - a.t)
+			if i == 2 then
+				u = 1 - (1 - u) ^ 3 -- the slash: fast start, soft stop
+			elseif i == 1 then
+				u = 1 - (1 - u) ^ 2
+			else
+				u = u * u -- follow-through accelerates away
+			end
+			return a.cf:Lerp(b.cf, u)
+		end
+	end
+	return KNIFE_KEYS[#KNIFE_KEYS].cf
+end
 local meleeStartedAt, nextMeleeAt = -10, 0
 local knifeParts = {} -- { {part, offset} }
 
@@ -103,8 +128,25 @@ local function buildViewmodel()
 		addVmPart("Sight", Vector3.new(0.12, 0.1, 0.3), CFrame.new(0, 0.28, -L * 0.1), v.Accent, Enum.Material.Neon)
 	end
 	addVmPart("Accent", Vector3.new(0.34, 0.05, L * 0.6), CFrame.new(0, 0.13, -L * 0.08), v.Accent, Enum.Material.Neon)
-	addVmPart("RightHand", Vector3.new(0.34, 0.34, 0.6), CFrame.new(0.06, -0.32, L * 0.25), skin)
-	addVmPart("LeftHand", Vector3.new(0.34, 0.34, 0.5), CFrame.new(-0.02, -0.18, -L * 0.45), skin)
+	-- Arms: gloved hands on the grip and under the barrel, forearms + sleeves running
+	-- off the bottom of the screen so it reads as two arms holding the gun.
+	local glove = Color3.fromRGB(40, 38, 44)
+	local sleeve = Color3.fromRGB(60, 52, 70)
+	local function limb(name, a: Vector3, b: Vector3, thick: number, color, material)
+		local mid = (a + b) / 2
+		local cf = CFrame.lookAt(mid, b)
+		addVmPart(name, Vector3.new(thick, thick, (b - a).Magnitude), cf, color, material)
+	end
+	local rHand = Vector3.new(0.08, -0.34, L * 0.22)
+	local rElbow = Vector3.new(0.75, -1.35, 1.9)
+	local lHand = Vector3.new(-0.05, -0.24, -L * 0.42)
+	local lElbow = Vector3.new(-1.05, -1.45, 0.7)
+	addVmPart("RightGlove", Vector3.new(0.36, 0.4, 0.55), CFrame.new(rHand) * CFrame.Angles(math.rad(-15), 0, 0), glove, Enum.Material.Fabric)
+	addVmPart("LeftGlove", Vector3.new(0.4, 0.3, 0.55), CFrame.new(lHand) * CFrame.Angles(0, 0, math.rad(-20)), glove, Enum.Material.Fabric)
+	limb("RightForearm", rHand + Vector3.new(0.02, -0.08, 0.25), rHand:Lerp(rElbow, 0.55), 0.3, skin)
+	limb("RightSleeve", rHand:Lerp(rElbow, 0.5), rElbow, 0.42, sleeve, Enum.Material.Fabric)
+	limb("LeftForearm", lHand + Vector3.new(-0.05, -0.08, 0.2), lHand:Lerp(lElbow, 0.55), 0.3, skin)
+	limb("LeftSleeve", lHand:Lerp(lElbow, 0.5), lElbow, 0.42, sleeve, Enum.Material.Fabric)
 	flash = addVmPart("Flash", Vector3.one * 0.5, CFrame.new(0, 0.08, -(L / 2 + B + 0.33)), Color3.fromRGB(255, 210, 120), Enum.Material.Neon, Enum.PartType.Ball)
 	flash.Transparency = 1
 	flashLight = Instance.new("PointLight")
@@ -140,7 +182,9 @@ local function buildKnife()
 	add("Guard", Vector3.new(0.4, 0.08, 0.08), CFrame.new(0, 0, 0), Color3.fromRGB(80, 80, 90), Enum.Material.Metal)
 	add("Blade", Vector3.new(0.06, 0.22, 1.1), CFrame.new(0, 0, -0.55), Color3.fromRGB(220, 225, 235), Enum.Material.Metal)
 	add("Edge", Vector3.new(0.07, 0.04, 1.1), CFrame.new(0, -0.11, -0.55), Color3.fromRGB(80, 220, 255), Enum.Material.Neon)
-	add("Hand", Vector3.new(0.34, 0.34, 0.5), CFrame.new(0, 0, 0.35), Color3.fromRGB(240, 200, 170), Enum.Material.SmoothPlastic)
+	add("Glove", Vector3.new(0.38, 0.4, 0.55), CFrame.new(0, 0, 0.35), Color3.fromRGB(40, 38, 44), Enum.Material.Fabric)
+	add("Forearm", Vector3.new(0.3, 0.3, 1.5), CFrame.new(0.08, -0.12, 1.3) * CFrame.Angles(math.rad(8), 0, 0), Color3.fromRGB(240, 200, 170), Enum.Material.SmoothPlastic)
+	add("Sleeve", Vector3.new(0.42, 0.42, 1.2), CFrame.new(0.14, -0.26, 2.5) * CFrame.Angles(math.rad(8), 0, 0), Color3.fromRGB(60, 52, 70), Enum.Material.Fabric)
 	model.Parent = workspace.CurrentCamera
 end
 
@@ -443,15 +487,16 @@ local function update(dt)
 	local sway = CFrame.Angles(swayY * (1 - adsAlpha * 0.7), swayX * (1 - adsAlpha * 0.7), swayX * 0.5)
 	local kick = CFrame.new(0, 0, kickBack) * CFrame.Angles(math.rad(kickPitch), 0, 0)
 
-	-- Knife swing: gun dips out of the way while the knife slashes right-to-left.
+	-- Knife: wind-up (raise to upper right) → fast diagonal slash (down to lower left)
+	-- → follow-through off screen. The gun dips smoothly out of the way and comes back.
 	local meleeT = (os.clock() - meleeStartedAt) / KNIFE_TIME
 	local meleePose = CFrame.new()
 	if meleeT < 1 then
-		local s = math.sin(meleeT * math.pi)
-		meleePose = CFrame.new(0.3 * s, -0.9 * s, 0.4 * s) * CFrame.Angles(math.rad(-30) * s, 0, math.rad(-20) * s)
+		local dip = meleeT < 0.15 and (meleeT / 0.15) or (meleeT > 0.7 and (1 - (meleeT - 0.7) / 0.3) or 1)
+		dip = dip * dip * (3 - 2 * dip) -- smoothstep
+		meleePose = CFrame.new(0.25 * dip, -1.0 * dip, 0.5 * dip) * CFrame.Angles(math.rad(-35) * dip, math.rad(10) * dip, math.rad(-15) * dip)
 		local camCf = workspace.CurrentCamera.CFrame
-		local x = 1.1 - 2.0 * meleeT
-		local knifeCf = camCf * CFrame.new(x, -0.45 + 0.25 * s, -1.7) * CFrame.Angles(math.rad(-10), math.rad(70 - 140 * meleeT), math.rad(-80))
+		local knifeCf = camCf * knifePose(meleeT)
 		for _, entry in knifeParts do
 			entry[1].CFrame = knifeCf * entry[2]
 			entry[1].LocalTransparencyModifier = 0

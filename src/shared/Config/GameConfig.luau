@@ -8,8 +8,8 @@ local GameConfig = {
 	ActiveMap = "Dustwater",
 
 	-- Timings (seconds)
-	FirstIntermission = 10,
-	Intermission = 8,
+	FirstIntermission = 6,
+	Intermission = 6, -- shorter breaks = faster pace
 	GameOverDuration = 10,
 
 	-- Points economy
@@ -25,18 +25,18 @@ local GameConfig = {
 	-- Player
 	Player = {
 		WalkSpeed = 16,
-		SprintSpeed = 23,
+		SprintSpeed = 25,
 		MaxHealth = 100,
 	},
 
 	-- Sprint stamina (client-side movement; the bar is on the HUD)
 	Stamina = {
 		Max = 100,
-		DrainPerSecond = 24, -- ~4s of continuous sprint
-		RegenPerSecond = 20,
-		RegenDelay = 1.0, -- seconds after you stop sprinting
-		MinToRestart = 25, -- once empty, must recover to this before sprinting again
-		SwiftStepDrainMult = 0.6, -- Swift Step perk: sprint lasts longer
+		DrainPerSecond = 12, -- ~8s of continuous sprint (was ~4s)
+		RegenPerSecond = 30, -- empty -> full in ~3.3s
+		RegenDelay = 0.6, -- seconds after you stop sprinting
+		MinToRestart = 15, -- once empty, must recover to this before sprinting again
+		SwiftStepDrainMult = 0.5, -- Swift Step perk: sprint lasts twice as long
 	},
 
 	-- Knife (V)

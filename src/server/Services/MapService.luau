@@ -25,6 +25,23 @@ local mapFolder: Folder
 local unlocked = {}
 local notify: RemoteEvent
 
+local CLIP_TOP = 60 -- player-clip volumes reach this height (well above any jump)
+
+-- Collision groups used by the map. Registered here because MapService initializes first.
+local function setupCollisionGroups()
+	local PhysicsService = game:GetService("PhysicsService")
+	for _, g in { "Players", "Enemies", "Corpses", "PlayerClip" } do
+		if not PhysicsService:IsCollisionGroupRegistered(g) then
+			PhysicsService:RegisterCollisionGroup(g)
+		end
+	end
+	-- PlayerClip: invisible walls only players bump into (bullets/zombies pass)
+	for _, g in { "Enemies", "Corpses", "Default" } do
+		PhysicsService:CollisionGroupSetCollidable("PlayerClip", g, false)
+	end
+	PhysicsService:CollisionGroupSetCollidable("PlayerClip", "Players", true)
+end
+
 ----------------------------------------------------------------------
 -- Builders
 ----------------------------------------------------------------------
@@ -87,6 +104,27 @@ local function lantern(pos: Vector3)
 	light.Parent = lamp
 end
 
+-- Invisible player-only blocker (see setupCollisionGroups).
+local function clip(name: string, min: Vector3, max: Vector3, parent: Instance?)
+	if max.Y - min.Y <= 0 then
+		return nil
+	end
+	local p = part({
+		Name = name,
+		Size = max - min,
+		Position = (min + max) / 2,
+		Transparency = 1,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
+	})
+	p.CollisionGroup = "PlayerClip"
+	if parent then
+		p.Parent = parent
+	end
+	return p
+end
+
 local function buildWalls()
 	for _, w in Layout.Walls or {} do
 		local h = w.height or Layout.WallHeight
@@ -118,6 +156,9 @@ local function buildWalls()
 				local pos = w.axis == "x" and Vector3.new(mid, y + h / 2, w.at) or Vector3.new(w.at, y + h / 2, mid)
 				local size = w.axis == "x" and Vector3.new(len + 2, h, 2) or Vector3.new(2, h, len + 2)
 				part({ Name = w.name or "Wall", Position = pos, Size = size, Color = wallColor, Material = material })
+				-- extend upward with an invisible player clip so nobody climbs over
+				local half = size / 2
+				clip("WallClip", Vector3.new(pos.X - half.X, y + h, pos.Z - half.Z), Vector3.new(pos.X + half.X, CLIP_TOP, pos.Z + half.Z))
 			end
 		end
 	end
@@ -161,6 +202,10 @@ local function buildDoors()
 		}
 		surfaceText(door, lines, d.Axis == "x" and Enum.NormalId.Front or Enum.NormalId.Right)
 		surfaceText(door, lines, d.Axis == "x" and Enum.NormalId.Back or Enum.NormalId.Left)
+		-- Clip from the door's top upward (child of the door, so it goes away when bought)
+		local half = size / 2
+		local top = d.Center.Y + h
+		clip("DoorClip", Vector3.new(d.Center.X - half.X, top, d.Center.Z - half.Z), Vector3.new(d.Center.X + half.X, math.max(CLIP_TOP, top + 1), d.Center.Z + half.Z), door)
 		CollectionService:AddTag(door, "Interactable")
 	end
 end
@@ -325,6 +370,8 @@ local function buildBarriers()
 		end
 		part({ Name = "BarrierSill", Size = sizeAlong(sill), Position = center + Vector3.new(0, sill / 2, 0), Color = wallColor, Material = wallMat })
 		part({ Name = "BarrierLintel", Size = sizeAlong(wallH - sill - openH), Position = center + Vector3.new(0, sill + openH + (wallH - sill - openH) / 2, 0), Color = wallColor, Material = wallMat })
+		local s = sizeAlong(1) / 2
+		clip("BarrierClip", Vector3.new(center.X - s.X, wallH, center.Z - s.Z), Vector3.new(center.X + s.X, CLIP_TOP, center.Z + s.Z))
 		-- window frame trim
 		part({ Name = "BarrierFrame", Size = sizeAlong(0.4) + (b.Axis == "x" and Vector3.new(0.6, 0, 0.3) or Vector3.new(0.3, 0, 0.6)), Position = center + Vector3.new(0, sill + openH + 0.2, 0), Color = Color3.fromRGB(70, 52, 40), Material = Enum.Material.Wood })
 
@@ -614,6 +661,17 @@ function GeometryApi.shell(name: string, minX, minZ, maxX, maxZ, baseY: number, 
 			GeometryApi.box(name .. "_Parapet", Vector3.new(maxX - 0.5, y0, minZ + 0.5), Vector3.new(maxX + 0.5, y0 + p, maxZ - 0.5), c, opts.material)
 		end
 	end
+	-- Keep players off roofs (no skipping doors, no unreachable camping spots).
+	-- Only above-ground buildings: an underground roof clip would poke up into the street.
+	if opts.roof ~= false and baseY >= 0 then
+		local roofTop = baseY + height + (opts.roof == "gable" and (opts.rise or 6) or 1)
+		clip(name .. "_RoofClip", Vector3.new(minX - 1.5, baseY + height, minZ - 1.5), Vector3.new(maxX + 1.5, roofTop + 14, maxZ + 1.5))
+	end
+end
+
+-- Player clip for map files (e.g. over stacked containers / vehicles people could camp on).
+function GeometryApi.clip(name: string, min: Vector3, max: Vector3)
+	return clip(name, min, max)
 end
 
 -- Evenly spaced windows along a wall span, skipping any that overlap `avoid` ranges.
@@ -706,6 +764,7 @@ end
 
 function MapService.Init()
 	notify = Remotes.Get("Notify")
+	setupCollisionGroups()
 	build()
 	setAtmosphere()
 end
