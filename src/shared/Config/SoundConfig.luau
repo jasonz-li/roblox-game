@@ -8,8 +8,9 @@ export type SoundDef = { Ids: { string }, Volume: number, PitchVariance: number?
 
 local SoundConfig: { [string]: SoundDef } = {
 	-- Weapons (client, 2D for the shooter)
-	-- Main gunshot. Pick the recording in-game with F6 (see GunshotCandidates below).
-	RifleShot = { Ids = { "rbxassetid://107457358196366" }, Volume = 0.3, PitchVariance = 0.05 },
+	-- Main gunshot: ".50 Beowulf" recording, picked in-game via the F6 audition (2026-11-19).
+	-- Pitch per weapon comes from WeaponConfig.ShotPitch (pistol/SMG higher, LMG/sniper lower).
+	RifleShot = { Ids = { "rbxassetid://6975483207" }, Volume = 0.3, PitchVariance = 0.05 },
 	HeavyShot = { Ids = { "rbxassetid://6975483207" }, Volume = 0.4, PitchVariance = 0.04 },
 	-- Low "thump" layered under every shot for weight (toggle in-game with F7)
 	ShotThump = { Ids = { "rbxassetid://9113632382" }, Volume = 0.1, PitchVariance = 0.08 },
