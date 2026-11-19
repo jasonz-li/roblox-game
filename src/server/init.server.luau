@@ -10,6 +10,10 @@ local ORDER = {
 	"PlayerService",
 	"EnemyService",
 	"WeaponService",
+	"PerkService",
+	"MysteryBoxService",
+	"PowerUpService",
+	"InteractionService",
 	"WaveService",
 }
 

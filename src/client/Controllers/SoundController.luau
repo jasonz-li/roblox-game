@@ -6,6 +6,7 @@ local Debris = game:GetService("Debris")
 local SoundService = game:GetService("SoundService")
 
 local SoundConfig = require(game.ReplicatedStorage.Shared.Config.SoundConfig)
+local WeaponConfig = require(game.ReplicatedStorage.Shared.Config.WeaponConfig)
 local Remotes = require(game.ReplicatedStorage.Shared.Net.Remotes)
 
 local SoundController = {}
@@ -19,7 +20,7 @@ local function pick(name)
 end
 
 -- Non-positional sound (your own gun, hitmarkers, UI).
-function SoundController.Play(name: string, volumeScale: number?)
+function SoundController.Play(name: string, volumeScale: number?, pitch: number?)
 	local template = pick(name)
 	if not template then
 		return
@@ -27,7 +28,7 @@ function SoundController.Play(name: string, volumeScale: number?)
 	local def = SoundConfig[name]
 	local s = template:Clone()
 	s.Volume = def.Volume * (volumeScale or 1)
-	s.PlaybackSpeed = 1 + (math.random() * 2 - 1) * (def.PitchVariance or 0)
+	s.PlaybackSpeed = (pitch or 1) * (1 + (math.random() * 2 - 1) * (def.PitchVariance or 0))
 	s.Parent = SoundService
 	s:Play()
 	Debris:AddItem(s, s.TimeLength > 0 and s.TimeLength / s.PlaybackSpeed + 0.2 or 4)
@@ -35,7 +36,7 @@ function SoundController.Play(name: string, volumeScale: number?)
 end
 
 -- Positional one-shot (other players' gunshots).
-function SoundController.PlayAt(name: string, position: Vector3, maxDistance: number?)
+function SoundController.PlayAt(name: string, position: Vector3, maxDistance: number?, pitch: number?)
 	local template = pick(name)
 	if not template then
 		return
@@ -52,7 +53,7 @@ function SoundController.PlayAt(name: string, position: Vector3, maxDistance: nu
 	anchor.Parent = worldFolder
 	local s = template:Clone()
 	s.Volume = def.Volume
-	s.PlaybackSpeed = 1 + (math.random() * 2 - 1) * (def.PitchVariance or 0)
+	s.PlaybackSpeed = (pitch or 1) * (1 + (math.random() * 2 - 1) * (def.PitchVariance or 0))
 	s.RollOffMode = Enum.RollOffMode.InverseTapered
 	s.RollOffMinDistance = 8
 	s.RollOffMaxDistance = maxDistance or 200
@@ -81,16 +82,24 @@ function SoundController.Init()
 end
 
 function SoundController.Start()
-	Remotes.Get("ShotFx").OnClientEvent:Connect(function(_shooter, origin)
-		if typeof(origin) == "Vector3" then
-			SoundController.PlayAt("RifleShot", origin)
+	Remotes.Get("ShotFx").OnClientEvent:Connect(function(_shooter, origin, _endPos, weaponId, upgraded)
+		if typeof(origin) ~= "Vector3" then
+			return
 		end
+		local stats = typeof(weaponId) == "string" and WeaponConfig.Get(weaponId, upgraded == true)
+		SoundController.PlayAt(stats and stats.ShotSound or "RifleShot", origin, nil, stats and stats.ShotPitch or 1)
 	end)
-	Remotes.Get("Notify").OnClientEvent:Connect(function(kind)
+	Remotes.Get("Notify").OnClientEvent:Connect(function(kind, data)
 		if kind == "WaveStart" then
 			SoundController.Play("WaveStart")
 		elseif kind == "WaveComplete" then
 			SoundController.Play("WaveComplete")
+		elseif kind == "Sound" and typeof(data) == "table" and SoundConfig[data.name] then
+			SoundController.Play(data.name)
+		elseif kind == "PowerUp" then
+			SoundController.Play(data.id == "Nuke" and "Nuke" or "PowerUp")
+		elseif kind == "DoorOpened" and typeof(data) == "table" and typeof(data.position) == "Vector3" then
+			SoundController.PlayAt("DoorOpen", data.position, 250)
 		end
 	end)
 end

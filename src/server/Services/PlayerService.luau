@@ -51,6 +51,17 @@ local function onCharacterAdded(player: Player, character: Model)
 	humanoid.WalkSpeed = GameConfig.Player.WalkSpeed
 	humanoid.BreakJointsOnDeath = false
 
+	-- Collision group so enemy corpses pass through players.
+	local function setGroup(d)
+		if d:IsA("BasePart") then
+			d.CollisionGroup = "Players"
+		end
+	end
+	for _, d in character:GetDescendants() do
+		setGroup(d)
+	end
+	character.DescendantAdded:Connect(setGroup)
+
 	task.defer(function()
 		if root.Parent then
 			character:PivotTo(MapService.GetPlayerSpawnCFrame())

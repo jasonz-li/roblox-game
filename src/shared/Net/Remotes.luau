@@ -5,11 +5,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local NAMES = {
-	"Fire", -- C->S  (origin: Vector3, direction: Vector3, claimedPart: BasePart?)
+	"Fire", -- C->S  (origin: Vector3, directions: {Vector3}, claimedParts: {BasePart | false})
 	"Reload", -- C->S
-	"HitConfirm", -- S->C  (isHeadshot: boolean, isKill: boolean, damage: number)
+	"SwitchWeapon", -- C->S  (slot: number)
+	"Melee", -- C->S  (lookDirection: Vector3, claimedEnemyPart: BasePart?)
+	"HitConfirm", -- S->C  (isHeadshot, isKill, totalDamage, hits: {{model, pos, damage, head, kill}}, isMelee)
 	"ShotFx", -- S->C  (shooter: Player, origin: Vector3, endPos: Vector3)
 	"Notify", -- S->C  (kind: string, data: any)
+	-- kinds: Points, WaveStart, WaveComplete, GameOver, Message, Sound, PowerUp, DoorOpened
 }
 
 local Remotes = {}

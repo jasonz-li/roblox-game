@@ -131,6 +131,11 @@ function EnemyService.Spawn(enemyId: string, wave: number)
 	humanoid.Health = maxHealth
 	local isRunner = math.random() < WaveConfig.RunnerChance(wave)
 	humanoid.WalkSpeed = isRunner and stats.RunSpeed or stats.WalkSpeed
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CollisionGroup = "Enemies"
+		end
+	end
 
 	model.Parent = enemiesFolder
 	model.PrimaryPart:SetNetworkOwner(nil) -- server-owned physics: no client control, no ownership jitter
@@ -146,6 +151,7 @@ function EnemyService.Spawn(enemyId: string, wave: number)
 		lastAttack = 0,
 		nextGroan = os.clock() + math.random() * 3,
 		isRunner = isRunner,
+		baseSpeed = humanoid.WalkSpeed,
 		-- pathing
 		waypoints = nil,
 		waypointIndex = 0,
@@ -187,38 +193,89 @@ end
 -- Damage & death
 ----------------------------------------------------------------------
 
-local function despawn(data)
+-- Death: the block body comes apart and is knocked away from the shot, then fades.
+-- Parts move to the "Corpses" collision group so they never block players or enemies.
+local function despawn(data, hitDir: Vector3?, isHeadshot: boolean?)
 	local model = data.model
-	data.root.Anchored = true
+	local push = (hitDir and hitDir.Magnitude > 0) and Vector3.new(hitDir.X, 0, hitDir.Z).Unit or Vector3.zero
+	if data.humanoid.Parent then
+		data.humanoid:Destroy()
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("WeldConstraint") then
+			d:Destroy()
+		end
+	end
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.CanQuery = false
-			if d ~= data.root then
-				TweenService:Create(d, TweenInfo.new(0.45), { Transparency = 1 }):Play()
+			d.CanTouch = false
+			if d == data.root then
+				d.Anchored = true
+				continue
 			end
+			d.CollisionGroup = "Corpses"
+			d.CanCollide = true
+			d.Massless = false
+			local isHead = d.Name == "Head" or d.Name == "Eye"
+			local speed = (isHead and isHeadshot) and 55 or 22
+			local spread = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5) * 14
+			d.AssemblyLinearVelocity = push * speed + spread + Vector3.new(0, (isHead and isHeadshot) and 30 or 14, 0)
+			d.AssemblyAngularVelocity = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 20
+			pcall(function()
+				d:SetNetworkOwner(nil)
+			end)
+			TweenService:Create(d, TweenInfo.new(0.6, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, false, 1.4), { Transparency = 1 }):Play()
 		end
 	end
-	task.delay(0.5, function()
+	task.delay(2.1, function()
 		model:Destroy()
 	end)
 end
 
--- Returns true if this hit killed the enemy.
-function EnemyService.Damage(data, amount: number, attacker: Player?, isHeadshot: boolean): boolean
+-- Brief stagger on non-lethal hits (bigger on headshots) so hits feel like they land.
+local function flinch(data, isHeadshot: boolean?)
+	local hum = data.humanoid
+	data.flinchToken = (data.flinchToken or 0) + 1
+	local token = data.flinchToken
+	hum.WalkSpeed = data.baseSpeed * (isHeadshot and 0.15 or 0.4)
+	task.delay(isHeadshot and 0.3 or 0.15, function()
+		if not data.dead and data.flinchToken == token then
+			hum.WalkSpeed = data.baseSpeed
+		end
+	end)
+end
+
+-- Returns true if this hit killed the enemy. hitDir (optional) = direction of the shot, for knockback.
+function EnemyService.Damage(data, amount: number, attacker: Player?, isHeadshot: boolean, hitDir: Vector3?): boolean
 	if data.dead then
 		return false
 	end
 	local hum = data.humanoid
 	hum.Health = math.max(0, hum.Health - amount)
 	if hum.Health > 0 then
+		flinch(data, isHeadshot)
 		return false
 	end
 	data.dead = true
 	enemies[data.model] = nil
 	aliveCount -= 1
-	despawn(data)
+	local deathPos = data.root.Position
+	data.deathPosition = deathPos
+	despawn(data, hitDir, isHeadshot)
 	EnemyService.EnemyDied:Fire(data, attacker, isHeadshot)
 	return true
+end
+
+-- Nuke: kill every live enemy with no killer (no per-kill points or drops).
+function EnemyService.KillAll()
+	local list = {}
+	for _, data in enemies do
+		table.insert(list, data)
+	end
+	for _, data in list do
+		EnemyService.Damage(data, math.huge, nil, false, Vector3.new(math.random() - 0.5, 0, math.random() - 0.5))
+	end
 end
 
 function EnemyService.ClearAll()
@@ -382,6 +439,17 @@ local function aiTick(dt: number)
 end
 
 function EnemyService.Init()
+	-- Collision groups: corpses only collide with the world.
+	local PhysicsService = game:GetService("PhysicsService")
+	for _, g in { "Players", "Enemies", "Corpses" } do
+		if not PhysicsService:IsCollisionGroupRegistered(g) then
+			PhysicsService:RegisterCollisionGroup(g)
+		end
+	end
+	PhysicsService:CollisionGroupSetCollidable("Corpses", "Players", false)
+	PhysicsService:CollisionGroupSetCollidable("Corpses", "Enemies", false)
+	PhysicsService:CollisionGroupSetCollidable("Corpses", "Corpses", false)
+
 	local existing = workspace:FindFirstChild("Enemies")
 	if existing then
 		existing:Destroy()

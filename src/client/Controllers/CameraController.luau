@@ -23,6 +23,18 @@ function CameraController.SetSprinting(value: boolean)
 	sprinting = value
 end
 
+-- Short FOV punch for kills / knife hits.
+local fovPunch = 0
+function CameraController.Punch(amount: number)
+	fovPunch = math.max(fovPunch, amount)
+end
+
+-- Small random screen shake (decays fast).
+local shake = 0
+function CameraController.Shake(amount: number)
+	shake = math.max(shake, amount)
+end
+
 function CameraController.Kick(pitch: number, yaw: number)
 	recoilPitch = math.min(recoilPitch + pitch, 8)
 	recoilYaw += yaw
@@ -41,6 +53,14 @@ function CameraController.Start()
 		local cam = workspace.CurrentCamera
 		local targetFov = adsFov or (sprinting and BASE_FOV + SPRINT_FOV_BONUS or BASE_FOV)
 		cam.FieldOfView += (targetFov - cam.FieldOfView) * math.min(1, dt * 14)
+		if fovPunch > 0.01 then
+			cam.FieldOfView += fovPunch
+			fovPunch -= fovPunch * math.min(1, dt * 18)
+		end
+		if shake > 0.01 then
+			cam.CFrame *= CFrame.Angles(math.rad((math.random() - 0.5) * shake), math.rad((math.random() - 0.5) * shake), 0)
+			shake -= shake * math.min(1, dt * 20)
+		end
 
 		if math.abs(recoilPitch) > 0.001 or math.abs(recoilYaw) > 0.001 then
 			cam.CFrame *= CFrame.Angles(math.rad(recoilPitch), math.rad(recoilYaw), 0)

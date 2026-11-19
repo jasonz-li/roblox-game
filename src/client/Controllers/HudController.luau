@@ -7,6 +7,9 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Remotes = require(game.ReplicatedStorage.Shared.Net.Remotes)
+local WeaponConfig = require(game.ReplicatedStorage.Shared.Config.WeaponConfig)
+local PerkConfig = require(game.ReplicatedStorage.Shared.Config.PerkConfig)
+local PowerUpConfig = require(game.ReplicatedStorage.Shared.Config.PowerUpConfig)
 local SoundController = require(script.Parent.SoundController)
 
 local THREAT_RANGE = 24 -- studs: show edge arrows for enemies this close
@@ -24,7 +27,8 @@ local PANEL = Color3.fromRGB(14, 12, 22)
 local gui: ScreenGui
 local ui = {}
 local crosshairSpreadPx, crosshairPulse = 8, 0
-local ads = false
+local ads, scoped = false, false
+local GOLD = WeaponConfig.Upgrade.Accent
 
 ----------------------------------------------------------------------
 -- UI helpers
@@ -160,6 +164,20 @@ local function buildHealthAndPoints()
 		Parent = barBg,
 	}, { corner(4) })
 	ui.healthText = label({ Text = "100", Font = Enum.Font.GothamBold, TextSize = 12, Size = UDim2.fromScale(1, 1), Parent = barBg })
+
+	local stamBg = new("Frame", {
+		Position = UDim2.new(0, 14, 1, -9),
+		Size = UDim2.new(1, -28, 0, 4),
+		BackgroundColor3 = Color3.fromRGB(40, 30, 46),
+		BorderSizePixel = 0,
+		Parent = panel,
+	}, { corner(2) })
+	ui.staminaFill = new("Frame", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = ACCENT2,
+		BorderSizePixel = 0,
+		Parent = stamBg,
+	}, { corner(2) })
 end
 
 local function buildWaveInfo()
@@ -204,6 +222,142 @@ local function buildWaveInfo()
 		Size = UDim2.fromOffset(800, 30),
 		Parent = gui,
 	})
+end
+
+-- Weapon slots, stacked above the ammo panel.
+local function buildSlots()
+	ui.slots = {}
+	for i = 1, WeaponConfig.MaxSlots do
+		ui.slots[i] = label({
+			Name = "Slot" .. i,
+			Text = "",
+			Font = Enum.Font.GothamBold,
+			TextSize = 15,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -32, 1, -128 - (WeaponConfig.MaxSlots - i) * 22),
+			Size = UDim2.fromOffset(300, 20),
+			Parent = gui,
+		})
+	end
+end
+
+local function refreshSlots()
+	local cur = player:GetAttribute("CurrentSlot") or 1
+	for i, l in ui.slots do
+		local id = player:GetAttribute("Slot" .. i) or ""
+		local up = player:GetAttribute("Slot" .. i .. "Up") == true
+		local stats = id ~= "" and WeaponConfig.Get(id, up)
+		l.Text = string.format("[%d]  %s", i, stats and string.upper(stats.DisplayName) or "—")
+		l.TextColor3 = (i == cur) and (up and GOLD or WHITE) or Color3.fromRGB(140, 140, 160)
+		l.TextTransparency = (i == cur) and 0 or 0.25
+	end
+end
+
+-- Perk icons, above the vitals panel.
+local function buildPerkRow()
+	ui.perkRow = new("Frame", {
+		Name = "Perks",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 28, 1, -128),
+		Size = UDim2.fromOffset(270, 34),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6) }) })
+end
+
+local function refreshPerks()
+	for _, c in ui.perkRow:GetChildren() do
+		if c:IsA("TextLabel") then
+			c:Destroy()
+		end
+	end
+	local order = player:GetAttribute("PerkOrder") or ""
+	for i, id in string.split(order, ",") do
+		local perk = PerkConfig.Perks[id]
+		if perk then
+			local icon = label({
+				Name = id,
+				LayoutOrder = i,
+				Text = perk.Letter,
+				TextSize = 20,
+				Size = UDim2.fromOffset(34, 34),
+				BackgroundTransparency = 0.1,
+				BackgroundColor3 = perk.Color,
+				TextColor3 = Color3.new(1, 1, 1),
+				Parent = ui.perkRow,
+			})
+			corner(8).Parent = icon
+		end
+	end
+end
+
+-- Active power-up timers, under the wave counter.
+local function buildPowerTimers()
+	ui.powerTimers = {}
+	local i = 0
+	for _, id in { "DoublePoints", "InstaKill" } do
+		local def = PowerUpConfig.PowerUps[id]
+		ui.powerTimers[id] = label({
+			Text = "",
+			Font = Enum.Font.GothamBlack,
+			TextSize = 18,
+			TextColor3 = def.Color,
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 88 + i * 22),
+			Size = UDim2.fromOffset(300, 22),
+			Visible = false,
+			Parent = gui,
+		})
+		i += 1
+	end
+end
+
+-- Toast messages (purchases, errors, box moved)
+local function buildToast()
+	ui.toast = label({
+		Text = "",
+		Font = Enum.Font.GothamBold,
+		TextSize = 22,
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.7),
+		Size = UDim2.fromOffset(800, 30),
+		Parent = gui,
+	})
+end
+
+local TONES = {
+	good = Color3.fromRGB(120, 255, 160),
+	bad = Color3.fromRGB(255, 100, 120),
+	info = Color3.fromRGB(150, 210, 255),
+}
+
+local function toast(text: string, tone: string?)
+	ui.toast.Text = text
+	ui.toast.TextColor3 = TONES[tone or "info"] or WHITE
+	ui.toast.TextTransparency = 0
+	ui.toast.TextStrokeTransparency = 0.5
+	TweenService:Create(ui.toast, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 1.8), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+end
+
+-- Sniper scope: black bars around a square window + thin reticle (PLACEHOLDER art).
+local function buildScope()
+	ui.scope = new("Frame", { Name = "Scope", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = gui })
+	local black = Color3.new(0, 0, 0)
+	new("Frame", { AnchorPoint = Vector2.new(0, 0), Position = UDim2.fromScale(0, 0), Size = UDim2.new(0.5, -300, 1, 0), BackgroundColor3 = black, BorderSizePixel = 0, ZIndex = 5, Parent = ui.scope })
+	new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0), Size = UDim2.new(0.5, -300, 1, 0), BackgroundColor3 = black, BorderSizePixel = 0, ZIndex = 5, Parent = ui.scope })
+	new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0), Size = UDim2.new(0, 600, 0.5, -300), BackgroundColor3 = black, BorderSizePixel = 0, ZIndex = 5, Parent = ui.scope })
+	new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromScale(0.5, 1), Size = UDim2.new(0, 600, 0.5, -300), BackgroundColor3 = black, BorderSizePixel = 0, ZIndex = 5, Parent = ui.scope })
+	-- Round window: a thick stroke on a circle covers the square's corners.
+	local window = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(600, 600), BackgroundTransparency = 1, ZIndex = 5, Parent = ui.scope }, {
+		new("UIStroke", { Thickness = 130, Color = black }),
+		corner(300),
+	})
+	new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = black, BorderSizePixel = 0, ZIndex = 6, Parent = window })
+	new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0, 1, 1, 0), BackgroundColor3 = black, BorderSizePixel = 0, ZIndex = 6, Parent = window })
+	new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(4, 4), BackgroundColor3 = ACCENT, BorderSizePixel = 0, ZIndex = 7, Parent = window }, { corner(2) })
 end
 
 -- Edge arrows pointing at nearby enemies (works with sound off too).
@@ -300,8 +454,9 @@ end
 -- Public API (used by WeaponController)
 ----------------------------------------------------------------------
 
-function HudController.SetAmmo(mag: number, reserve: number, reloading: boolean, weaponName: string, magSize: number)
+function HudController.SetAmmo(mag: number, reserve: number, reloading: boolean, weaponName: string, magSize: number, upgraded: boolean?)
 	ui.weaponName.Text = string.upper(weaponName)
+	ui.weaponName.TextColor3 = upgraded and GOLD or ACCENT2
 	ui.ammoMag.Text = tostring(mag)
 	ui.ammoReserve.Text = "/ " .. tostring(reserve)
 	local low = mag <= math.floor(magSize * 0.25)
@@ -317,6 +472,11 @@ function HudController.SetAmmo(mag: number, reserve: number, reloading: boolean,
 	end
 end
 
+function HudController.SetStamina(frac: number, exhausted: boolean)
+	ui.staminaFill.Size = UDim2.fromScale(math.clamp(frac, 0, 1), 1)
+	ui.staminaFill.BackgroundColor3 = exhausted and Color3.fromRGB(255, 90, 110) or ACCENT2
+end
+
 function HudController.SetCrosshairSpread(degrees: number)
 	crosshairSpreadPx = 6 + degrees * 7
 end
@@ -325,8 +485,9 @@ function HudController.PulseCrosshair()
 	crosshairPulse = math.min(crosshairPulse + 5, 14)
 end
 
-function HudController.SetAds(value: boolean)
+function HudController.SetAds(value: boolean, hasScope: boolean?)
 	ads = value
+	scoped = value and hasScope == true
 end
 
 function HudController.ShowHitmarker(isHeadshot: boolean, isKill: boolean)
@@ -413,6 +574,11 @@ function HudController.Init()
 	buildHealthAndPoints()
 	buildWaveInfo()
 	buildThreatIndicators()
+	buildSlots()
+	buildPerkRow()
+	buildPowerTimers()
+	buildToast()
+	buildScope()
 	buildOverlays()
 end
 
@@ -431,9 +597,25 @@ function HudController.Start()
 		elseif kind == "WaveStart" then
 			showBanner("WAVE " .. data.wave, "Survive.", Color3.fromRGB(255, 70, 90))
 		elseif kind == "WaveComplete" then
-			showBanner("WAVE " .. data.wave .. " CLEARED", "+" .. data.bonus .. " pts  •  ammo refilled", ACCENT2)
+			showBanner("WAVE " .. data.wave .. " CLEARED", "+" .. data.bonus .. " pts", ACCENT2)
+		elseif kind == "Message" then
+			toast(data.text, data.tone)
+		elseif kind == "PowerUp" then
+			local def = PowerUpConfig.PowerUps[data.id]
+			showBanner(data.name, "picked up by " .. tostring(data.by), def and def.Color)
+		elseif kind == "DoorOpened" then
+			toast((data.by or "Someone") .. " opened the way to " .. table.concat(data.zones, " / "), "info")
 		end
 	end)
+
+	for i = 1, WeaponConfig.MaxSlots do
+		player:GetAttributeChangedSignal("Slot" .. i):Connect(refreshSlots)
+		player:GetAttributeChangedSignal("Slot" .. i .. "Up"):Connect(refreshSlots)
+	end
+	player:GetAttributeChangedSignal("CurrentSlot"):Connect(refreshSlots)
+	player:GetAttributeChangedSignal("PerkOrder"):Connect(refreshPerks)
+	refreshSlots()
+	refreshPerks()
 
 	if player.Character then
 		task.spawn(bindCharacter, player.Character)
@@ -447,10 +629,21 @@ function HudController.Start()
 		for _, entry in ui.crossLines do
 			local line, dir = entry[1], entry[2]
 			line.Position = UDim2.fromOffset(dir.X * (gap + 4), dir.Y * (gap + 4))
-			line.Visible = not ads
+			line.Visible = not ads and not scoped
 		end
 
 		updateThreats(dt)
+		ui.scope.Visible = scoped
+
+		-- Power-up timers
+		local now = workspace:GetServerTimeNow()
+		for id, l in ui.powerTimers do
+			local left = (gameState:GetAttribute(id .. "Until") or 0) - now
+			l.Visible = left > 0
+			if left > 0 then
+				l.Text = PowerUpConfig.PowerUps[id].DisplayName .. "  " .. math.ceil(left)
+			end
+		end
 
 		-- Wave info
 		local state = gameState:GetAttribute("State")

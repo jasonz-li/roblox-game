@@ -12,6 +12,9 @@ local PlayerService = require(script.Parent.PlayerService)
 local EnemyService = require(script.Parent.EnemyService)
 local CurrencyService = require(script.Parent.CurrencyService)
 local WeaponService = require(script.Parent.WeaponService)
+local MapService = require(script.Parent.MapService)
+local MysteryBoxService = require(script.Parent.MysteryBoxService)
+local PowerUpService = require(script.Parent.PowerUpService)
 
 local WaveService = {}
 
@@ -76,6 +79,9 @@ end
 
 local function resetMatch()
 	EnemyService.ClearAll()
+	MapService.Reset() -- relock doors
+	MysteryBoxService.Reset()
+	PowerUpService.Reset()
 	CurrencyService.ResetAll()
 	wave = 0
 	gameOver = false

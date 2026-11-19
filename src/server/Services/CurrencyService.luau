@@ -58,23 +58,32 @@ function CurrencyService.Get(player: Player): number
 	return player:GetAttribute("Points") or 0
 end
 
-function CurrencyService.Add(player: Player, amount: number, reason: string?)
+-- `earned` = combat points that Double Points applies to (hits/kills), not bonuses/refunds.
+function CurrencyService.Add(player: Player, amount: number, reason: string?, earned: boolean?)
 	if amount == 0 or not player.Parent then
 		return
 	end
-	player:SetAttribute("Points", CurrencyService.Get(player) + math.floor(amount))
+	if earned then
+		local until_ = Remotes.GameState():GetAttribute("DoublePointsUntil") or 0
+		if workspace:GetServerTimeNow() < until_ then
+			amount *= 2
+		end
+	end
+	amount = math.floor(amount)
+	player:SetAttribute("Points", CurrencyService.Get(player) + amount)
 	sync(player)
-	notify:FireClient(player, "Points", { amount = math.floor(amount), reason = reason })
+	notify:FireClient(player, "Points", { amount = amount, reason = reason })
 end
 
--- Returns true if the player could afford it (used by purchases in M2).
+-- Atomic check-and-deduct. Returns true if the player could afford it.
 function CurrencyService.TrySpend(player: Player, amount: number): boolean
 	local current = CurrencyService.Get(player)
-	if amount < 0 or current < amount then
+	if amount < 0 or amount ~= amount or current < amount then
 		return false
 	end
 	player:SetAttribute("Points", current - amount)
 	sync(player)
+	notify:FireClient(player, "Points", { amount = -amount })
 	return true
 end
 
