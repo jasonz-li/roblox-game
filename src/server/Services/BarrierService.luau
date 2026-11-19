@@ -102,6 +102,7 @@ function BarrierService.Repair(player: Player, barrier: BasePart)
 		local amount = math.min(cfg.RepairPoints, cfg.RepairPointsCapPerWave - earned)
 		repairEarned[player] = earned + amount
 		CurrencyService.Add(player, amount, "Repair")
+		Remotes.Get("Notify"):FireClient(player, "Sound", { name = "RepairCash" }) -- cha-ching
 	end
 end
 

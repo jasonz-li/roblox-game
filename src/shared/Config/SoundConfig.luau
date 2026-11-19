@@ -45,8 +45,10 @@ local SoundConfig: { [string]: SoundDef } = {
 
 	-- Barriers (server, 3D on the window). Wood snaps = Pro Sound Effects (Roblox-licensed).
 	BoardBreak = { Ids = { "rbxassetid://9120962232", "rbxassetid://9120962381" }, Volume = 0.6, PitchVariance = 0.1 },
-	-- Short wooden "board onto post" knock. Audition alternatives in-game with F8 (RepairCandidates).
-	BoardRepair = { Ids = { "rbxassetid://9120888980" }, Volume = 0.3, PitchVariance = 0.08 },
+	-- "Wood beam knock" (Pro Sound Effects), picked in-game via the F8 audition (2026-11-19).
+	BoardRepair = { Ids = { "rbxassetid://9120885468" }, Volume = 0.3, PitchVariance = 0.08 },
+	-- Cash-register cha-ching for the repairing player on every paid board (2D, local).
+	RepairCash = { Ids = { "rbxassetid://9113728042" }, Volume = 0.35, PitchVariance = 0.04 },
 
 	-- Enemies (server, 3D positional on the enemy)
 	ZombieGroan = {

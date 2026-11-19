@@ -1,4 +1,5 @@
 --!strict
+-- Picked: #4 "Wood beam knock" (now in SoundConfig.BoardRepair).
 -- DEV: window-repair sounds to audition in-game with F8 (all Pro Sound Effects,
 -- Roblox-licensed, verified to load). F8 plays the next one three times in a
 -- row at the real repair rhythm. Copy the winner's Id into SoundConfig.BoardRepair.
