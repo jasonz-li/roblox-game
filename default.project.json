@@ -15,7 +15,17 @@
       }
     },
 
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": false
+      }
+    },
+
     "StarterPlayer": {
+      "$properties": {
+        "CameraMode": "LockFirstPerson",
+        "CameraMaxZoomDistance": 0.5
+      },
       "StarterPlayerScripts": {
         "Client": {
           "$path": "src/client"
