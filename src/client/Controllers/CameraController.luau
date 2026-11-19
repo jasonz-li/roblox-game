@@ -46,7 +46,39 @@ function CameraController.Init()
 	UserInputService.MouseIconEnabled = false
 end
 
+-- Always hide our own body/accessories in first person (the viewmodel is the only
+-- thing we should see). Roblox's default fade can be interrupted by camera changes,
+-- and big head accessories then fill the whole screen.
+local ownParts = {}
+local function trackCharacter(char: Model)
+	table.clear(ownParts)
+	local function add(d)
+		if d:IsA("BasePart") or d:IsA("Decal") then
+			table.insert(ownParts, d)
+		end
+	end
+	for _, d in char:GetDescendants() do
+		add(d)
+	end
+	char.DescendantAdded:Connect(add)
+end
+
 function CameraController.Start()
+	local player = Players.LocalPlayer
+	if player.Character then
+		trackCharacter(player.Character)
+	end
+	player.CharacterAdded:Connect(trackCharacter)
+	RunService:BindToRenderStep("HideOwnBody", Enum.RenderPriority.Camera.Value + 3, function()
+		for _, p in ownParts do
+			if p:IsA("BasePart") then
+				p.LocalTransparencyModifier = 1
+			else
+				p.Transparency = 1
+			end
+		end
+	end)
+
 	-- Runs right after the default camera script has positioned the camera,
 	-- so the kick is layered on top and decays back to the player's aim.
 	RunService:BindToRenderStep("FpsCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)

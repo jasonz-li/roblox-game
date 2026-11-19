@@ -4,6 +4,9 @@
 local GameConfig = {
 	MaxPlayers = 4,
 
+	-- Which layout in src/server/Maps to load ("Dustwater" or the old "ShrineDistrict" test map)
+	ActiveMap = "Dustwater",
+
 	-- Timings (seconds)
 	FirstIntermission = 10,
 	Intermission = 8,
