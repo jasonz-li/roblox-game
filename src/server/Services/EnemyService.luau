@@ -90,6 +90,15 @@ local function buildModel(stats, position: Vector3): Model
 	local skin = stats.BodyColor
 	local cloth = Color3.fromRGB(60, 52, 70)
 	weldedPart(model, root, "Torso", Vector3.new(2, 2, 1), CFrame.new(), cloth)
+	-- Invisible body collider (y 1.6..5.4 above the ground): zombies shove each other
+	-- into a crowd instead of overlapping, and it's too tall to step up onto.
+	-- CanQuery off so bullets/knife still hit the visible parts.
+	local collider = weldedPart(model, root, "Collider", Vector3.new(2.2, 3.8, 1.6), CFrame.new(0, 0.5, 0), cloth)
+	collider.Transparency = 1
+	collider.CanCollide = true
+	collider.CanQuery = false
+	collider.CanTouch = false
+	collider.CastShadow = false
 	local head = weldedPart(model, root, "Head", Vector3.new(1.3, 1.3, 1.3), CFrame.new(0, 1.65, 0), skin)
 	-- arms reach forward from the shoulder; legs hang from the hip
 	jointedPart(model, root, "LeftArm", Vector3.new(0.6, 0.6, 1.9), CFrame.new(-1.3, 0.6, 0.15), CFrame.new(0, 0, -0.95), skin)
@@ -174,7 +183,9 @@ function EnemyService.Spawn(enemyId: string, wave: number)
 		-- Claw up out of the ground: start below, rise, then hand over to physics.
 		local finalCf = root.CFrame
 		root.Anchored = true
-		root.CFrame = finalCf - Vector3.new(0, 6, 0)
+		-- PivotTo moves every part. Setting only root.CFrame before parenting left the
+		-- welded torso/head 6 studs above the root: those were the floating zombies.
+		model:PivotTo(finalCf - Vector3.new(0, 6, 0))
 		model.Parent = enemiesFolder
 		TweenService:Create(root, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = finalCf }):Play()
 		busyUntil = os.clock() + 1.15
@@ -213,7 +224,7 @@ function EnemyService.Spawn(enemyId: string, wave: number)
 		if spawnInfo.barrier then
 			-- face the window
 			local inside = spawnInfo.barrier:GetAttribute("Inside")
-			root.CFrame = CFrame.lookAt(root.Position, Vector3.new(inside.X, root.Position.Y, inside.Z))
+			model:PivotTo(CFrame.lookAt(root.Position, Vector3.new(inside.X, root.Position.Y, inside.Z)))
 		end
 	end
 	CollectionService:AddTag(model, "Enemy")
@@ -285,6 +296,10 @@ local function despawn(data, hitDir: Vector3?, isHeadshot: boolean?)
 		if d:IsA("WeldConstraint") or d:IsA("Motor6D") then
 			d:Destroy()
 		end
+	end
+	local collider = model:FindFirstChild("Collider")
+	if collider then
+		collider:Destroy()
 	end
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
@@ -595,9 +610,9 @@ function EnemyService.Init()
 	PhysicsService:CollisionGroupSetCollidable("Corpses", "Players", false)
 	PhysicsService:CollisionGroupSetCollidable("Corpses", "Enemies", false)
 	PhysicsService:CollisionGroupSetCollidable("Corpses", "Corpses", false)
-	-- Zombies pass through each other: they crowd into a horde instead of climbing
-	-- onto each other's heads (which made some "float" in the air).
-	PhysicsService:CollisionGroupSetCollidable("Enemies", "Enemies", false)
+	-- Zombies collide with each other (a crowd, not overlapping bodies); the tall
+	-- body collider stops them stepping onto each other's heads.
+	PhysicsService:CollisionGroupSetCollidable("Enemies", "Enemies", true)
 	-- Player-only blocking volumes (stop players climbing over walls/roofs to skip doors)
 	if not PhysicsService:IsCollisionGroupRegistered("PlayerClip") then
 		PhysicsService:RegisterCollisionGroup("PlayerClip")
