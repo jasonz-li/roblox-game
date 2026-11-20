@@ -36,69 +36,72 @@ from reserve · hits award points · headshots deal more damage · enemies chase
 and hit you · waves advance and get harder · dying mid-wave → respawn next
 wave · all dead → game over → restart · no console errors.
 
-## Milestone 2: Zombies-style economy and map
-- Interaction system (ProximityPrompt + server validation)
-- Wall-buy weapons (3–4 weapon classes), ammo purchase
-- Buyable doors and map sections, shared unlocks
-- Mystery box (weighted pool, moves locations)
-- Perk machines (health, reload speed, fire rate, revive-speed placeholder)
-- Upgrade machine (weapon tier up)
-- Power-up drops (max ammo, double points, nuke)
-- Generic `RemoteGuard` rate limiter
-- First real blockout of map 1
+## Milestone 2: Zombies-style economy and map ✅
+- ✅ Interaction system (ProximityPrompt + server validation)
+- ✅ Wall-buy weapons, ammo purchase
+- ✅ Buyable doors and map sections, shared unlocks (6 doors; duplicates removed)
+- ✅ Mystery box (weighted pool, moves locations)
+- ✅ Perk machines: 8 perks incl. Storm Coil, Phoenix Draught, Pack Mule Tonic, Hawkeye Elixir
+- ✅ Spirit Forge: 3 levels per gun, each gun has a signature upgrade (Twin Foxfire etc.)
+- ✅ Power-up drops (max ammo, double points, insta-kill, nuke; Titan immune)
+- ✅ Generic `RemoteGuard` rate limiter
+- ✅ Map 1 "Dustwater": stages 1–4 done, shrunk from hotspot data; ⬜ stage 5 polish
+- ✅ Boarded windows: hold E to repair (position based), points + seal bonus
 
-## Milestone 3: Heroes and abilities 🚧
-- Ability framework (server cooldowns, client prediction of VFX) — `AbilityService`, `AbilityController`
-- Ultimate charge (kills / headshots / elites)
-- 2 heroes fully playable (Swordsman, Mage), placeholder VFX — Ren (Gale Step / Tempest), Yuki (Frost Nova / Starfall)
-- Hero selection (dev menu until the lobby exists) — H between waves
+## Milestone 3: Heroes and abilities 🚧 (built, needs rework)
+- ✅ Ability framework — `AbilityService`, `AbilityController`
+- ✅ Ultimate charge (kills / headshots / elites)
+- ✅ 2 heroes: Ren (Gale Step / Tempest), Yuki (Frost Nova / Starfall), placeholder VFX
+- ✅ Hero selection (H between waves, until the lobby exists)
+- ⬜ **Rework Gale Step and Tempest** (playtest: "Tempest useless, Gale Step feels bad")
 
-**Verified (2026-11-20):** hero switch between waves, Frost Nova cast + cooldown,
-recast and uncharged-ultimate rejected, Starfall charge → cast → reset with effects.
-**Not yet verified:** Gale Step dash feel, Tempest, balance.
+## Built outside milestone order (2026-11-19 → 11-20 playtest loop)
+- 10-wave level with the Dust Titan boss finale, victory screen and rewards
+- Anime impact frames, knife stab with hit-stop, ragdoll deaths with dissolve
+- Kill streaks (milestones, streak UAV), CoD-style minimap with radar sweeps
+- Zombies-style spawning: entry-point rotation, direction spread, window queues,
+  lost-zombie relocation, hunt mode for the last zombies, nuke-proof alive cap
+- Tighter point economy; sprint while reloading; sniper collateral + iron sights
+- Studio-only `DevService` test hook
 
-## Pulled forward (built early, outside milestone order)
-- M5: elite zombies + elite waves (every 5th)
-- M6: pick-1-of-3 upgrade cards every 2 waves (10 stackable upgrades)
-- M7: `DataService` (session locking, autosave, schema) + Spirit Shards from streaks,
-  elites and waves; end-of-run summary
-- Kill streaks with milestone rewards and a streak UAV; CoD-style minimap with radar sweeps
+## Milestone 4: Co-op depth ⬜ (not started)
+- ⬜ Downed state and hold-to-revive
+- ⬜ Difficulty scaling by player count (verified with a 4-player local test)
+- ⬜ Movement sanity checks
+- ⬜ Spectate while dead
+- ⬜ Any multiplayer playtest at all (everything so far was solo)
 
-## Milestone 4: Co-op depth
-- Downed state and hold-to-revive
-- Difficulty scaling by player count (verified with 4-player local test)
-- Movement sanity checks
-- Spectate while dead
+## Milestone 5: Enemy variety and bosses 🚧
+- ⬜ Crawler, Brute, Spitter, Exploder
+- ✅ Elite zombies + Elite Wave (wave 5)
+- 🚧 First boss with an arena — Dust Titan (slam, health bar); ⬜ phases
+- ⬜ AI performance pass (custom mover, 50+ enemies target)
 
-## Milestone 5: Enemy variety and bosses
-- Crawler, Brute, Spitter, Exploder
-- Elite wave modifiers
-- First boss with phases and an arena
-- AI performance pass (custom mover, 50+ enemies target)
+## Milestone 6: Roguelite upgrades 🚧 (mostly done)
+- ✅ Data-driven upgrade pool with rarities (Common/Rare/Legendary/Cursed), weighted rolls
+- ✅ Pick-1-of-3 after every wave
+- 🚧 Synergies (Volatile + Chain Reaction); ⬜ a proper tags system
+- ⬜ Hero-specific upgrades
 
-## Milestone 6: Roguelite upgrades
-- Upgrade pool (data-driven), rarities, weighted rolls
-- Pick-1-of-3 UI after designated waves
-- Tags and synergies
-- Hero-specific upgrades
+## Milestone 7: Persistent data and progression 🚧
+- ✅ `DataService` with session locking, autosave, schema version
+- ✅ Spirit Shards (earnable currency) from streaks, elites, waves, victory; run summary
+- ⬜ Hero XP, weapon XP
+- ⬜ Loadouts (starting weapon from collection)
+- ⬜ Hero levels, ability upgrades, evolution
+- ⬜ Enable Studio API access and verify saves actually persist
 
-## Milestone 7: Persistent data and progression
-- DataService with session locking, autosave, migrations
-- Match rewards → hero XP, weapon XP, soft currency
-- Loadouts (starting weapon from collection)
-- Hero levels, ability upgrades, evolution
-
-## Milestone 8: Gacha
+## Milestone 8: Gacha ⬜
 - Banner config, rarity tables, pity/soft pity/50-50
 - Atomic server transactions
 - Summon UI with odds/pity display and animations
 - Duplicate conversion, collection inventory
 
-## Milestone 9: Lobby, parties, matchmaking
+## Milestone 9: Lobby, parties, matchmaking ⬜
 - Lobby place, party invites, MemoryStore queues, TeleportService to match
   servers, reward return
 
-## Milestone 10: Content and polish
+## Milestone 10: Content and polish ⬜ (some early pieces: impact frames, ragdolls)
 - Art pass (anime visuals, viewmodels, animations), audio, UI theme
 - Map 2, more heroes and weapons, challenges, achievements, cosmetics
 - Performance and mobile/controller support
