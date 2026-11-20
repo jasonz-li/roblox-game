@@ -14,6 +14,7 @@ local ORDER = {
 	"PerkService",
 	"MysteryBoxService",
 	"PowerUpService",
+	"ProgressionService",
 	"InteractionService",
 	"WaveService",
 }

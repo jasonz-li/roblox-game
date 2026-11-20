@@ -18,6 +18,8 @@ local PlayerService = require(script.Parent.PlayerService)
 local EnemyService = require(script.Parent.EnemyService)
 local CurrencyService = require(script.Parent.CurrencyService)
 local MapService = require(script.Parent.MapService)
+local ProgressionService = require(script.Parent.ProgressionService)
+local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 
 local WeaponService = {}
 
@@ -247,6 +249,8 @@ local function onFire(player: Player, origin, directions, claims)
 	local hitEnemies, anyHead, anyKill, total = {}, false, false, 0
 	local report = {} -- per-hit info for the shooter's damage numbers / flashes
 	local firstEnd
+	local dmgMult = ProgressionConfig.DamageMult(player)
+	local headMult = stats.HeadshotMultiplier * ProgressionConfig.HeadshotMult(player)
 
 	for i, dir in dirs do
 		local claimed = claims[i]
@@ -257,7 +261,7 @@ local function onFire(player: Player, origin, directions, claims)
 		firstEnd = firstEnd or endPos
 		for _, h in hits do
 			local isHead = h.part.Name == "Head"
-			local damage = stats.Damage * (isHead and stats.HeadshotMultiplier or 1) * (PIERCE_FALLOFF ^ h.index)
+			local damage = stats.Damage * dmgMult * (isHead and headMult or 1) * (PIERCE_FALLOFF ^ h.index)
 			if instaKill then
 				damage = h.enemy.humanoid.Health
 			end
@@ -275,7 +279,9 @@ local function onFire(player: Player, origin, directions, claims)
 			if killed then
 				anyKill = true
 				CurrencyService.AddKill(player)
-				CurrencyService.Add(player, isHead and GameConfig.Points.HeadshotKill or GameConfig.Points.Kill, isHead and "Headshot" or "Kill", true)
+				local mult = ProgressionService.OnKill(player, isHead)
+				local base = isHead and GameConfig.Points.HeadshotKill or GameConfig.Points.Kill
+				CurrencyService.Add(player, math.floor(base * mult), isHead and "Headshot" or "Kill", true)
 			end
 		end
 	end
@@ -336,13 +342,14 @@ local function onMelee(player: Player, lookDir, claimedPart)
 		return
 	end
 	local instaKill = workspace:GetServerTimeNow() < (gameState:GetAttribute("InstaKillUntil") or 0)
-	local damage = instaKill and best.humanoid.Health or cfg.Damage
+	local damage = instaKill and best.humanoid.Health or cfg.Damage * ProgressionConfig.KnifeMult(player)
 	local model, pos = best.model, best.root.Position + Vector3.new(0, 1, 0)
 	local killed = EnemyService.Damage(best, damage, player, false, lookDir)
 	CurrencyService.Add(player, GameConfig.Points.Hit, nil, true)
 	if killed then
 		CurrencyService.AddKill(player)
-		CurrencyService.Add(player, cfg.KillPoints, "Knife", true)
+		local mult = ProgressionService.OnKill(player, false)
+		CurrencyService.Add(player, math.floor(cfg.KillPoints * mult), "Knife", true)
 	end
 	hitConfirm:FireClient(player, false, killed, damage, { { model, pos, math.floor(damage), false, killed } }, true)
 end

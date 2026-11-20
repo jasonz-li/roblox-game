@@ -5,6 +5,7 @@
 
 local PerkConfig = require(game.ReplicatedStorage.Shared.Config.PerkConfig)
 local GameConfig = require(game.ReplicatedStorage.Shared.Config.GameConfig)
+local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 local PlayerService = require(script.Parent.PlayerService)
 
 local PerkService = {}
@@ -53,8 +54,9 @@ function PerkService.Grant(player: Player, perkId: string)
 		return
 	end
 	if perkId == "IronBody" then
-		hum.MaxHealth = PerkConfig.IronBodyHealth
-		hum.Health = PerkConfig.IronBodyHealth
+		local max = PerkConfig.IronBodyHealth + ProgressionConfig.BonusHealth(player)
+		hum.MaxHealth = max
+		hum.Health = max
 	elseif perkId == "SwiftStep" then
 		hum.WalkSpeed = GameConfig.Player.WalkSpeed * PerkConfig.SwiftStepSpeedMult
 	end

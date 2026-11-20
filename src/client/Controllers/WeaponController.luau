@@ -9,6 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local WeaponConfig = require(game.ReplicatedStorage.Shared.Config.WeaponConfig)
 local PerkConfig = require(game.ReplicatedStorage.Shared.Config.PerkConfig)
+local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 local GameConfig = require(game.ReplicatedStorage.Shared.Config.GameConfig)
 local Remotes = require(game.ReplicatedStorage.Shared.Net.Remotes)
 local CameraController = require(script.Parent.CameraController)
@@ -420,6 +421,8 @@ local function update(dt)
 	-- Movement (sprint cancelled by ADS, firing, reloading). SwiftStep perk scales both speeds.
 	-- Sprint costs stamina; once empty you must recover to MinToRestart before sprinting again.
 	local sc = GameConfig.Stamina
+	local staminaMult = ProgressionConfig.StaminaMult(player) -- Second Wind upgrade
+	local maxStamina = sc.Max * staminaMult
 	local speedMult = PerkConfig.SpeedMultiplier(player)
 	local wantsSprint = sprintHeld and isMoving(hum) and not adsHeld and not triggerHeld and not reloading and not exhausted and stamina > 0
 	if wantsSprint then
@@ -430,12 +433,12 @@ local function update(dt)
 			exhausted = true
 		end
 	elseif os.clock() - lastSprintAt > sc.RegenDelay then
-		stamina = math.min(sc.Max, stamina + sc.RegenPerSecond * dt)
+		stamina = math.min(maxStamina, stamina + sc.RegenPerSecond * staminaMult * dt)
 	end
 	if exhausted and stamina >= sc.MinToRestart then
 		exhausted = false
 	end
-	HudController.SetStamina(stamina / sc.Max, exhausted)
+	HudController.SetStamina(stamina / maxStamina, exhausted)
 	hum.WalkSpeed = (wantsSprint and GameConfig.Player.SprintSpeed or GameConfig.Player.WalkSpeed) * speedMult
 	CameraController.SetSprinting(wantsSprint)
 

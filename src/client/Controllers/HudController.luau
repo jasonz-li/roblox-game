@@ -595,7 +595,7 @@ function HudController.Start()
 		if kind == "Points" then
 			pointsPopup(data.amount)
 		elseif kind == "WaveStart" then
-			showBanner("WAVE " .. data.wave, "Survive.", Color3.fromRGB(255, 70, 90))
+			showBanner("WAVE " .. data.wave, data.elite and "ELITE WAVE: burning zombies drop rewards" or "Survive.", Color3.fromRGB(255, 70, 90))
 		elseif kind == "WaveComplete" then
 			showBanner("WAVE " .. data.wave .. " CLEARED", "+" .. data.bonus .. " pts", ACCENT2)
 		elseif kind == "Message" then

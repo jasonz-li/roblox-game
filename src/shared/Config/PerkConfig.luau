@@ -45,12 +45,15 @@ function PerkConfig.AttributeName(perkId: string): string
 end
 
 -- Helpers shared by client prediction and server enforcement.
+-- They also fold in the run's upgrade picks (ProgressionConfig).
+local ProgressionConfig = require(script.Parent.ProgressionConfig)
+
 function PerkConfig.ReloadMultiplier(player: Player): number
-	return player:GetAttribute("Perk_QuickHands") and PerkConfig.QuickHandsReloadMult or 1
+	return (player:GetAttribute("Perk_QuickHands") and PerkConfig.QuickHandsReloadMult or 1) * ProgressionConfig.ReloadMult(player)
 end
 
 function PerkConfig.RpmMultiplier(player: Player): number
-	return player:GetAttribute("Perk_RapidFire") and PerkConfig.RapidFireRpmMult or 1
+	return (player:GetAttribute("Perk_RapidFire") and PerkConfig.RapidFireRpmMult or 1) * ProgressionConfig.RpmMult(player)
 end
 
 function PerkConfig.SpeedMultiplier(player: Player): number

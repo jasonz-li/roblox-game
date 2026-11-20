@@ -15,6 +15,8 @@ local WeaponService = require(script.Parent.WeaponService)
 local MapService = require(script.Parent.MapService)
 local MysteryBoxService = require(script.Parent.MysteryBoxService)
 local PowerUpService = require(script.Parent.PowerUpService)
+local ProgressionService = require(script.Parent.ProgressionService)
+local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 
 local WaveService = {}
 
@@ -48,13 +50,14 @@ local function runWave()
 	killsThisWave = 0
 	updateRemaining()
 	setState("Wave")
-	notify:FireAllClients("WaveStart", { wave = wave })
+	notify:FireAllClients("WaveStart", { wave = wave, elite = ProgressionConfig.IsEliteWave(wave) })
 
 	local spawned = 0
 	local interval = WaveConfig.SpawnInterval(wave)
+	local eliteChance = ProgressionConfig.EliteChance(wave)
 	while spawned < totalThisWave and not gameOver do
 		if EnemyService.AliveCount() < EnemyConfig.MaxAlive then
-			if EnemyService.Spawn("Shambler", wave) then
+			if EnemyService.Spawn("Shambler", wave, { elite = math.random() < eliteChance }) then
 				spawned += 1
 				task.wait(interval)
 			else
@@ -85,6 +88,7 @@ local function resetMatch()
 	MapService.Reset() -- relock doors
 	MysteryBoxService.Reset()
 	PowerUpService.Reset()
+	ProgressionService.Reset()
 	CurrencyService.ResetAll()
 	wave = 0
 	gameOver = false
@@ -109,7 +113,8 @@ local function mainLoop()
 				break
 			end
 			waveReward()
-			intermission(GameConfig.Intermission)
+			local offered = ProgressionService.OfferUpgrades(wave)
+			intermission(GameConfig.Intermission + (offered and ProgressionConfig.Offer.ExtraIntermission or 0))
 		end
 
 		setState("GameOver")

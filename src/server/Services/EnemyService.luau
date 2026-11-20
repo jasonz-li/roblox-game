@@ -9,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 local EnemyConfig = require(game.ReplicatedStorage.Shared.Config.EnemyConfig)
 local SoundConfig = require(game.ReplicatedStorage.Shared.Config.SoundConfig)
 local WaveConfig = require(game.ReplicatedStorage.Shared.Config.WaveConfig)
+local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 local Signal = require(game.ReplicatedStorage.Shared.Util.Signal)
 local MapService = require(script.Parent.MapService)
 local PlayerService = require(script.Parent.PlayerService)
@@ -156,21 +157,65 @@ end
 -- Spawning / lookup
 ----------------------------------------------------------------------
 
-function EnemyService.Spawn(enemyId: string, wave: number)
+-- Elite look: bigger, scorched red body, burning yellow eyes, ember aura.
+local function makeElite(model: Model, spawnPos: Vector3)
+	local e = ProgressionConfig.Elite
+	model:ScaleTo(e.Scale)
+	model.Humanoid.HipHeight = HIP_HEIGHT * e.Scale
+	model:PivotTo(CFrame.new(spawnPos + Vector3.new(0, (HIP_HEIGHT + 1) * e.Scale, 0)) * model:GetPivot().Rotation)
+	for _, d in model:GetChildren() do
+		if d:IsA("BasePart") then
+			if d.Name == "Eye" then
+				d.Color = Color3.fromRGB(255, 220, 60)
+			elseif d.Name == "Torso" or d.Name:find("Leg") then
+				d.Color = Color3.fromRGB(90, 20, 24)
+			elseif d.Name ~= "HumanoidRootPart" and d.Name ~= "Collider" then
+				d.Color = d.Color:Lerp(Color3.fromRGB(160, 40, 40), 0.5)
+			end
+		end
+	end
+	local torso = model:FindFirstChild("Torso")
+	if torso then
+		local glow = Instance.new("PointLight")
+		glow.Color = Color3.fromRGB(255, 120, 40)
+		glow.Range = 12
+		glow.Brightness = 1.5
+		glow.Parent = torso
+		local embers = Instance.new("ParticleEmitter")
+		embers.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		embers.Color = ColorSequence.new(Color3.fromRGB(255, 160, 60), Color3.fromRGB(255, 60, 30))
+		embers.LightEmission = 1
+		embers.Size = NumberSequence.new(0.35, 0)
+		embers.Lifetime = NumberRange.new(0.6, 1.1)
+		embers.Rate = 14
+		embers.Speed = NumberRange.new(1, 3)
+		embers.SpreadAngle = Vector2.new(180, 180)
+		embers.Acceleration = Vector3.new(0, 5, 0)
+		embers.Parent = torso
+	end
+	model:SetAttribute("Elite", true)
+	model.Name = "Elite " .. model.Name
+end
+
+function EnemyService.Spawn(enemyId: string, wave: number, opts)
 	local stats = EnemyConfig.Enemies[enemyId]
 	assert(stats, "Unknown enemy " .. tostring(enemyId))
+	local isElite = opts and opts.elite == true
 
 	local spawnInfo = MapService.GetEnemySpawn()
 	if not spawnInfo then
 		return nil
 	end
 	local model = buildModel(stats, spawnInfo.pos)
+	if isElite then
+		makeElite(model, spawnInfo.pos)
+	end
 	local humanoid = model.Humanoid
-	local maxHealth = math.floor(stats.BaseHealth * WaveConfig.HealthMultiplier(wave))
+	local maxHealth = math.floor(stats.BaseHealth * WaveConfig.HealthMultiplier(wave) * (isElite and ProgressionConfig.Elite.HealthMult or 1))
 	humanoid.MaxHealth = maxHealth
 	humanoid.Health = maxHealth
-	local isRunner = math.random() < WaveConfig.RunnerChance(wave)
-	humanoid.WalkSpeed = isRunner and stats.RunSpeed or stats.WalkSpeed
+	local isRunner = isElite or math.random() < WaveConfig.RunnerChance(wave)
+	humanoid.WalkSpeed = isRunner and stats.RunSpeed * (isElite and 0.9 or 1) or stats.WalkSpeed
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.CollisionGroup = "Enemies"
@@ -237,7 +282,8 @@ function EnemyService.Spawn(enemyId: string, wave: number)
 		humanoid = humanoid,
 		root = model.PrimaryPart,
 		stats = stats,
-		damage = stats.Damage * WaveConfig.DamageMultiplier(wave),
+		damage = stats.Damage * WaveConfig.DamageMultiplier(wave) * (isElite and ProgressionConfig.Elite.DamageMult or 1),
+		isElite = isElite,
 		dead = false,
 		lastAttack = 0,
 		nextGroan = os.clock() + math.random() * 3,
