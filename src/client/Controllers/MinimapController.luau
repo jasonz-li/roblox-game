@@ -161,22 +161,25 @@ end
 
 local function build()
 	gui = new("ScreenGui", { Name = "Minimap", ResetOnSpawn = false, IgnoreGuiInset = true, Parent = player:WaitForChild("PlayerGui") })
-	local frame = new("CanvasGroup", {
+	-- Plain clipping frame (not a CanvasGroup: those didn't clip here). Clipping still
+	-- works because only the content inside is rotated, never this frame.
+	local frame = new("Frame", {
 		Name = "Map",
 		Position = UDim2.fromOffset(24, 24),
 		Size = UDim2.fromOffset(SIZE, SIZE),
 		BackgroundColor3 = Color3.fromRGB(14, 12, 22),
-		BackgroundTransparency = 0.1,
-		GroupTransparency = 0.08,
+		BackgroundTransparency = 0.15,
+		ClipsDescendants = true,
 		Parent = gui,
-	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
-	-- ring drawn outside the canvas group so it stays crisp
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 14) }) })
+	-- border drawn on top so it stays crisp
 	new("Frame", {
 		Position = UDim2.fromOffset(24, 24),
 		Size = UDim2.fromOffset(SIZE, SIZE),
 		BackgroundTransparency = 1,
+		ZIndex = 12,
 		Parent = gui,
-	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }), new("UIStroke", { Color = Color3.fromRGB(80, 220, 255), Thickness = 2, Transparency = 0.3 }) })
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 14) }), new("UIStroke", { Color = Color3.fromRGB(80, 220, 255), Thickness = 2, Transparency = 0.3 }) })
 
 	pivot = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, Parent = frame })
 	world = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(10, 10), Parent = pivot })
@@ -282,7 +285,7 @@ local function update()
 		takeSnapshot()
 		sweepRing.Size = UDim2.fromOffset(0, 0)
 		sweepRing.UIStroke.Transparency = 0.1
-		game:GetService("TweenService"):Create(sweepRing, TweenInfo.new(0.7, Enum.EasingStyle.Quad), { Size = UDim2.fromOffset(SIZE, SIZE) }):Play()
+		game:GetService("TweenService"):Create(sweepRing, TweenInfo.new(0.7, Enum.EasingStyle.Quad), { Size = UDim2.fromOffset(SIZE * 1.45, SIZE * 1.45) }):Play() -- reaches the corners
 		game:GetService("TweenService"):Create(sweepRing.UIStroke, TweenInfo.new(0.7), { Transparency = 1 }):Play()
 	end
 
@@ -301,8 +304,7 @@ local function update()
 	else
 		list = snapshot
 		fade = math.clamp((clock - lastSweep) / cfg.SweepShows, 0, 1)
-		sweepLabel.Text = string.format("RADAR  %ds", math.max(0, math.ceil(cfg.SweepEvery - (clock - lastSweep))))
-		sweepLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+		sweepLabel.Text = "" -- the sweep ring says enough; only a live UAV gets a label
 	end
 	for i, dot in dots do
 		local e = list[i]
