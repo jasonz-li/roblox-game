@@ -319,7 +319,7 @@ local function trySwitch(slot: number)
 end
 
 local function fire(hum, char)
-	if reloading or os.clock() < switchUntil then
+	if reloading or os.clock() < switchUntil or player:GetAttribute("Downed") then
 		return
 	end
 	if mag <= 0 then
@@ -477,6 +477,10 @@ local function update(dt)
 	end
 	HudController.SetStamina(stamina / maxStamina, exhausted)
 	hum.WalkSpeed = (wantsSprint and GameConfig.Player.SprintSpeed or GameConfig.Player.WalkSpeed) * speedMult
+	if player:GetAttribute("Downed") then
+		hum.WalkSpeed = 5 -- crawling: no sprint, no shooting until revived
+		wantsSprint = false
+	end
 	CameraController.SetSprinting(wantsSprint)
 
 	-- ADS

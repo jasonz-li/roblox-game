@@ -576,9 +576,78 @@ end
 -- Lifecycle
 ----------------------------------------------------------------------
 
+----------------------------------------------------------------------
+-- Downed & revive (co-op): your own "you're down" screen, and a marker over
+-- downed teammates telling you to hold E. State comes from player attributes
+-- set by PlayerService (Downed, DownedUntil, ReviveProgress).
+----------------------------------------------------------------------
+
+local function buildDownedUi()
+	ui.downed = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 30, Parent = gui })
+	-- red vignette edges
+	for _, e in { { UDim2.fromScale(0, 0), UDim2.new(1, 0, 0.18, 0) }, { UDim2.fromScale(0, 0.82), UDim2.new(1, 0, 0.18, 0) }, { UDim2.fromScale(0, 0), UDim2.new(0.12, 0, 1, 0) }, { UDim2.fromScale(0.88, 0), UDim2.new(0.12, 0, 1, 0) } } do
+		new("Frame", { Position = e[1], Size = e[2], BackgroundColor3 = Color3.fromRGB(150, 0, 20), BackgroundTransparency = 0.55, BorderSizePixel = 0, ZIndex = 30, Parent = ui.downed })
+	end
+	ui.downedTitle = label({ Text = "YOU'RE DOWN", TextSize = 46, TextColor3 = Color3.fromRGB(255, 80, 100), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.38), Size = UDim2.fromOffset(700, 52), ZIndex = 31, Parent = ui.downed })
+	ui.downedSub = label({ Text = "", Font = Enum.Font.GothamBold, TextSize = 20, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.45), Size = UDim2.fromOffset(700, 26), ZIndex = 31, Parent = ui.downed })
+	local bg = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(320, 12), BackgroundColor3 = Color3.fromRGB(40, 20, 26), BorderSizePixel = 0, ZIndex = 31, Parent = ui.downed }, { new("UICorner", { CornerRadius = UDim.new(0, 4) }) })
+	ui.reviveFill = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(120, 255, 170), BorderSizePixel = 0, ZIndex = 32, Parent = bg }, { new("UICorner", { CornerRadius = UDim.new(0, 4) }) })
+end
+
+local markers = {} -- [Player] = BillboardGui over a downed teammate
+
+local function markerFor(p: Player)
+	local head = p.Character and p.Character:FindFirstChild("Head")
+	if not head then
+		return nil
+	end
+	local m = markers[p]
+	if m and m.Parent and m.Adornee == head then
+		return m
+	end
+	if m then
+		m:Destroy()
+	end
+	m = new("BillboardGui", { Name = "DownedMarker", Adornee = head, AlwaysOnTop = true, Size = UDim2.fromOffset(170, 52), StudsOffset = Vector3.new(0, 3, 0), Parent = gui })
+	label({ Name = "Title", Text = "DOWNED · HOLD E", TextSize = 16, TextColor3 = Color3.fromRGB(255, 90, 110), Size = UDim2.new(1, 0, 0, 20), Parent = m })
+	local bg = new("Frame", { Position = UDim2.fromOffset(15, 26), Size = UDim2.new(1, -30, 0, 8), BackgroundColor3 = Color3.fromRGB(40, 20, 26), BorderSizePixel = 0, Parent = m }, { new("UICorner", { CornerRadius = UDim.new(0, 3) }) })
+	new("Frame", { Name = "Fill", Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(120, 255, 170), BorderSizePixel = 0, Parent = bg }, { new("UICorner", { CornerRadius = UDim.new(0, 3) }) })
+	markers[p] = m
+	return m
+end
+
+local function updateDowned()
+	local now = workspace:GetServerTimeNow()
+	-- me
+	local downed = player:GetAttribute("Downed") == true
+	ui.downed.Visible = downed
+	if downed then
+		local left = math.max(0, math.ceil((player:GetAttribute("DownedUntil") or 0) - now))
+		local prog = player:GetAttribute("ReviveProgress") or 0
+		ui.downedSub.Text = prog > 0 and "Being revived..." or ("A teammate can revive you · bleeding out in " .. left .. "s")
+		ui.reviveFill.Size = UDim2.fromScale(math.clamp(prog, 0, 1), 1)
+	end
+	-- teammates
+	for _, p in Players:GetPlayers() do
+		if p ~= player and p:GetAttribute("Downed") then
+			local m = markerFor(p)
+			if m then
+				local fill = m:FindFirstChild("Fill", true)
+				if fill then
+					fill.Size = UDim2.fromScale(math.clamp(p:GetAttribute("ReviveProgress") or 0, 0, 1), 1)
+				end
+			end
+		elseif markers[p] then
+			markers[p]:Destroy()
+			markers[p] = nil
+		end
+	end
+end
+
 function AbilityController.Init()
 	gui = new("ScreenGui", { Name = "Abilities", ResetOnSpawn = false, IgnoreGuiInset = true, Parent = player:WaitForChild("PlayerGui") })
 	buildHud()
+	buildDownedUi()
 end
 
 function AbilityController.Start()
@@ -629,6 +698,13 @@ function AbilityController.Start()
 	end)
 
 	RunService.RenderStepped:Connect(updateHud)
+	RunService.RenderStepped:Connect(updateDowned)
+	Players.PlayerRemoving:Connect(function(p)
+		if markers[p] then
+			markers[p]:Destroy()
+			markers[p] = nil
+		end
+	end)
 end
 
 return AbilityController
