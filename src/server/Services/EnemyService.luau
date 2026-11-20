@@ -767,6 +767,8 @@ end
 
 local function nearestTarget(pos: Vector3, characters)
 	local best, bestDist = nil, math.huge
+	local taunter, taunterDist = nil, math.huge
+	local now = workspace:GetServerTimeNow()
 	for _, char in characters do
 		local root = char:FindFirstChild("HumanoidRootPart")
 		if root then
@@ -774,9 +776,36 @@ local function nearestTarget(pos: Vector3, characters)
 			if d < bestDist then
 				best, bestDist = char, d
 			end
+			-- Kaida's War Cry: zombies in range go for her instead
+			local p = game.Players:GetPlayerFromCharacter(char)
+			if p and (p:GetAttribute("TauntUntil") or 0) > now and d <= (p:GetAttribute("TauntRadius") or 0) and d < taunterDist then
+				taunter, taunterDist = char, d
+			end
 		end
 	end
+	if taunter then
+		return taunter, taunterDist
+	end
 	return best, bestDist
+end
+
+-- Kaida's Fortress: domes zombies can't enter. { center, radius, untilT (os.clock) }
+local domes = {}
+function EnemyService.AddDome(center: Vector3, radius: number, duration: number)
+	table.insert(domes, { center = center, radius = radius, untilT = os.clock() + duration })
+end
+
+local function insideDome(pos: Vector3, pad: number?): any
+	local now = os.clock()
+	for i = #domes, 1, -1 do
+		local d = domes[i]
+		if now > d.untilT then
+			table.remove(domes, i)
+		elseif Vector3.new(pos.X - d.center.X, 0, pos.Z - d.center.Z).Magnitude <= d.radius + (pad or 0) then
+			return d
+		end
+	end
+	return nil
 end
 
 local function requestPath(data, targetPos: Vector3)
@@ -977,6 +1006,24 @@ local function aiTick(dt: number)
 		-- Frozen solid (Yuki): no moving, no attacking until it thaws.
 		if EnemyService.IsFrozen(data) then
 			hum:MoveTo(root.Position)
+			continue
+		end
+
+		-- Kaida's Fortress: zombies are shoved out of the dome and can't hit anyone inside.
+		local dome = insideDome(root.Position, 1.5)
+		if dome then
+			local out = Vector3.new(root.Position.X - dome.center.X, 0, root.Position.Z - dome.center.Z)
+			out = out.Magnitude > 0.1 and out.Unit or Vector3.xAxis
+			root.AssemblyLinearVelocity = out * 35 + Vector3.new(0, 6, 0)
+			hum:MoveTo(dome.center + out * (dome.radius + 4))
+			continue
+		end
+		if insideDome(targetPos) then
+			-- target is safe inside: circle the edge instead of attacking
+			local d = insideDome(targetPos)
+			local out = Vector3.new(root.Position.X - d.center.X, 0, root.Position.Z - d.center.Z)
+			out = out.Magnitude > 0.1 and out.Unit or Vector3.xAxis
+			hum:MoveTo(d.center + out * (d.radius + 3))
 			continue
 		end
 

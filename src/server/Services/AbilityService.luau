@@ -111,11 +111,102 @@ function cast.Mage(player, hero, root, aim)
 	return true
 end
 
+-- Kaida: War Cry. Zombies within the radius go for her (EnemyService reads TauntUntil)
+-- and she takes half damage while it lasts.
+function cast.Tank(player, hero, root, _aim)
+	local a = hero.Ability
+	local untilT = workspace:GetServerTimeNow() + a.Duration
+	player:SetAttribute("TauntUntil", untilT)
+	player:SetAttribute("TauntRadius", a.Radius)
+	notify:FireAllClients("AbilityFx", { kind = "WarCry", by = player, pos = root.Position, radius = a.Radius, duration = a.Duration })
+	return true
+end
+
+local function alliesNear(pos: Vector3, radius: number)
+	local list = {}
+	for _, p in Players:GetPlayers() do
+		local r = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+		local h = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+		if r and h and h.Health > 0 and (r.Position - pos).Magnitude <= radius then
+			table.insert(list, { player = p, hum = h, root = r })
+		end
+	end
+	return list
+end
+
+-- Mio: Spirit Pulse. Heal everyone nearby and give them a burst of speed.
+function cast.Medic(player, hero, root, _aim)
+	local a = hero.Ability
+	for _, ally in alliesNear(root.Position, a.Radius) do
+		ally.hum.Health = math.min(ally.hum.MaxHealth, ally.hum.Health + a.Heal)
+		ally.player:SetAttribute("HasteUntil", workspace:GetServerTimeNow() + a.HasteTime)
+		ally.player:SetAttribute("HasteMult", a.HasteMult)
+	end
+	notify:FireAllClients("AbilityFx", { kind = "SpiritPulse", by = player, pos = root.Position, radius = a.Radius })
+	return true
+end
+
 ----------------------------------------------------------------------
 -- Ultimates (F)
 ----------------------------------------------------------------------
 
 local ult = {}
+
+-- Kaida: Fortress. A dome zombies can't enter (EnemyService shoves them out) that
+-- heals everyone standing inside.
+function ult.Tank(player, hero, root, _aim)
+	local u = hero.Ultimate
+	local center = root.Position
+	EnemyService.AddDome(center, u.Radius, u.Duration)
+	player:SetAttribute("UltActive", true)
+	notify:FireAllClients("AbilityFx", { kind = "Fortress", by = player, pos = center, radius = u.Radius, duration = u.Duration })
+	task.spawn(function()
+		local t = 0
+		while t < u.Duration do
+			task.wait(0.5)
+			t += 0.5
+			for _, ally in alliesNear(center, u.Radius) do
+				ally.hum.Health = math.min(ally.hum.MaxHealth, ally.hum.Health + u.HealPerSecond * 0.5)
+			end
+		end
+		if player.Parent then
+			player:SetAttribute("UltActive", false)
+		end
+	end)
+	return true
+end
+
+-- Mio: Kitsune Guardian. A spirit fox floats by her and zaps the nearest zombie.
+function ult.Medic(player, hero, _root, _aim)
+	local u = hero.Ultimate
+	player:SetAttribute("UltActive", true)
+	notify:FireAllClients("AbilityFx", { kind = "GuardianStart", by = player, duration = u.Duration })
+	task.spawn(function()
+		local t = 0
+		while t < u.Duration and PlayerService.IsAlive(player) do
+			local r = player.Character.HumanoidRootPart
+			local fox = r.Position + Vector3.new(0, 5, 0) + r.CFrame.RightVector * 2.5
+			local best, bd = nil, u.Range
+			for _, data in EnemyService.InRadius(fox, u.Range) do
+				local d = (data.root.Position - fox).Magnitude
+				if d < bd then
+					best, bd = data, d
+				end
+			end
+			if best then
+				local targetPos = best.root.Position
+				hit(player, best, HeroConfig.Damage(u.Damage, wave()), (targetPos - fox).Unit)
+				notify:FireAllClients("AbilityFx", { kind = "SpiritBolt", by = player, from = fox, to = targetPos })
+			end
+			task.wait(u.Interval)
+			t += u.Interval
+		end
+		if player.Parent then
+			player:SetAttribute("UltActive", false)
+		end
+	end)
+	return true
+end
 
 function ult.Swordsman(player, hero, root, _aim)
 	local u = hero.Ultimate
@@ -251,6 +342,8 @@ function AbilityService.Reset()
 	for _, p in Players:GetPlayers() do
 		setUlt(p, 0)
 		p:SetAttribute("UltActive", false)
+		p:SetAttribute("TauntUntil", 0)
+		p:SetAttribute("HasteUntil", 0)
 		readyAt[p] = 0
 		p:SetAttribute("AbilityReadyAt", 0)
 	end
@@ -278,6 +371,32 @@ end
 function AbilityService.Start()
 	RemoteGuard.Connect(Remotes.Get("UseAbility"), { rate = 4, burst = 3 }, onUse)
 	RemoteGuard.Connect(Remotes.Get("SelectHero"), { rate = 2, burst = 2 }, onSelect)
+
+	-- Kaida: passive damage reduction, plus half damage during War Cry
+	table.insert(PlayerService.DamageMultipliers, function(p)
+		local hero = HeroConfig.Get(p:GetAttribute("Hero"))
+		local m = hero.DamageTakenMult or 1
+		if hero.Id == "Tank" and (p:GetAttribute("TauntUntil") or 0) > workspace:GetServerTimeNow() then
+			m *= hero.Ability.DamageTakenMult
+		end
+		return m
+	end)
+
+	-- Mio: Mending Aura, a steady heal for every ally near a Mio (her included)
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			for _, p in Players:GetPlayers() do
+				local hero = HeroConfig.Get(p:GetAttribute("Hero"))
+				local r = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+				if hero.Aura and r and PlayerService.IsAlive(p) then
+					for _, ally in alliesNear(r.Position, hero.Aura.Radius) do
+						ally.hum.Health = math.min(ally.hum.MaxHealth, ally.hum.Health + hero.Aura.HealPerSecond * 0.5)
+					end
+				end
+			end
+		end
+	end)
 
 	-- Ultimate charge from kills (not from kills made by an active ultimate)
 	EnemyService.EnemyDied:Connect(function(data, killer, headshot)

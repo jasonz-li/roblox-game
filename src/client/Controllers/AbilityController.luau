@@ -314,6 +314,99 @@ function FX.AbsoluteZeroPulse(d)
 	SoundController.PlayAt("ShotgunShot", d.pos, 80, 0.4)
 end
 
+-- Kaida (tank)
+function FX.WarCry(d)
+	ring(d.pos, d.radius, Color3.fromRGB(255, 170, 70), 0.7, 0.4)
+	ring(d.pos, d.radius * 0.5, Color3.fromRGB(255, 220, 140), 0.5, 0.6)
+	SoundController.PlayAt("ZombieAttack", d.pos, 140, 0.55)
+	-- a pulsing aura around her while it lasts (other players see it too)
+	local char = d.by and d.by.Character
+	local r = char and char:FindFirstChild("HumanoidRootPart")
+	if r then
+		local aura = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 7, Position = r.Position, Color = Color3.fromRGB(255, 150, 50), Transparency = 0.8 })
+		local t0 = os.clock()
+		local conn
+		conn = RunService.RenderStepped:Connect(function()
+			local t = os.clock() - t0
+			if t > d.duration or not r.Parent then
+				conn:Disconnect()
+				aura:Destroy()
+				return
+			end
+			aura.Position = r.Position
+			aura.Size = Vector3.one * (7 + math.sin(t * 8) * 0.8)
+		end)
+	end
+	if d.by == player then
+		ImpactController.Play("medium")
+	end
+end
+
+function FX.Fortress(d)
+	local dome = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 2, Position = d.pos, Color = Color3.fromRGB(255, 200, 90), Material = Enum.Material.ForceField, Transparency = 0.2 })
+	TweenService:Create(dome, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Size = Vector3.one * d.radius * 2 }):Play()
+	ring(d.pos, d.radius, Color3.fromRGB(255, 210, 110), 0.6, 0.4)
+	SoundController.PlayAt("PowerUp", d.pos, 160, 0.8)
+	task.delay(d.duration - 0.4, function()
+		fadeAndDie(dome, 0.4)
+	end)
+	if d.by == player then
+		ImpactController.Play("medium")
+	end
+end
+
+-- Mio (support)
+function FX.SpiritPulse(d)
+	ring(d.pos, d.radius, Color3.fromRGB(140, 255, 190), 0.6, 0.3)
+	local orb = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 2, Position = d.pos + Vector3.new(0, 2, 0), Color = Color3.fromRGB(180, 255, 210), Transparency = 0.3 })
+	fadeAndDie(orb, 0.5, { Size = Vector3.one * 10 })
+	SoundController.PlayAt("PerkDrink", d.pos, 120, 1.3)
+end
+
+function FX.GuardianStart(d)
+	local char = d.by and d.by.Character
+	local r = char and char:FindFirstChild("HumanoidRootPart")
+	if not r then
+		return
+	end
+	-- a glowing spirit fox orb with two ears, floating at her shoulder
+	local orb = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 1.6, Color = Color3.fromRGB(150, 255, 200), Transparency = 0.1 })
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(140, 255, 190)
+	light.Range = 14
+	light.Brightness = 2
+	light.Parent = orb
+	local ears = {
+		fxPart({ Size = Vector3.new(0.35, 0.7, 0.2), Color = Color3.fromRGB(220, 255, 235) }),
+		fxPart({ Size = Vector3.new(0.35, 0.7, 0.2), Color = Color3.fromRGB(220, 255, 235) }),
+	}
+	local t0 = os.clock()
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - t0
+		if t > d.duration or not r.Parent then
+			conn:Disconnect()
+			fadeAndDie(orb, 0.3)
+			for _, e in ears do
+				e:Destroy()
+			end
+			return
+		end
+		local cf = CFrame.new(r.Position + Vector3.new(0, 5 + math.sin(t * 3) * 0.4, 0) + r.CFrame.RightVector * 2.5) * r.CFrame.Rotation
+		orb.CFrame = cf
+		ears[1].CFrame = cf * CFrame.new(-0.45, 0.85, 0) * CFrame.Angles(0, 0, math.rad(15))
+		ears[2].CFrame = cf * CFrame.new(0.45, 0.85, 0) * CFrame.Angles(0, 0, math.rad(-15))
+	end)
+	SoundController.PlayAt("PowerUp", r.Position, 120, 1.5)
+end
+
+function FX.SpiritBolt(d)
+	local len = (d.to - d.from).Magnitude
+	local bolt = fxPart({ Size = Vector3.new(0.25, 0.25, len), CFrame = CFrame.lookAt((d.from + d.to) / 2, d.to), Color = Color3.fromRGB(150, 255, 200), Transparency = 0 })
+	fadeAndDie(bolt, 0.15)
+	SoundController.PlayAt("LaserShot", d.from, 70, 1.8)
+end
+
 -- Forge signature effects
 function FX.Explosion(d)
 	local color = d.color or Color3.fromRGB(255, 140, 40)

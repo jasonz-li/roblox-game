@@ -18,6 +18,8 @@ PlayerService.AllPlayersDead = Signal.new()
 -- Lethal guards: functions(player, humanoid) -> true if they saved the player from a
 -- killing blow (Second Chance pick, Phoenix perk). They run in order; first one wins.
 PlayerService.LethalGuards = {}
+-- Damage-taken multipliers: functions(player) -> number (Kaida's passive, War Cry)
+PlayerService.DamageMultipliers = {}
 
 -- All enemy damage to players goes through here (so guards can intercept death).
 function PlayerService.Damage(character: Model, amount: number)
@@ -25,8 +27,13 @@ function PlayerService.Damage(character: Model, amount: number)
 	if not hum or hum.Health <= 0 then
 		return
 	end
+	local player = Players:GetPlayerFromCharacter(character)
+	if player then
+		for _, fn in PlayerService.DamageMultipliers do
+			amount *= fn(player)
+		end
+	end
 	if hum.Health - amount <= 0 then
-		local player = Players:GetPlayerFromCharacter(character)
 		if player then
 			for _, guard in PlayerService.LethalGuards do
 				if guard(player, hum) then

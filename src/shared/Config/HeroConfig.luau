@@ -17,6 +17,9 @@ export type Hero = {
 	Ultimate: { [string]: any },
 	KnifeMult: number?,
 	UltChargeMult: number?,
+	DamageTakenMult: number?,
+	Shatter: { [string]: any }?,
+	Aura: { [string]: any }?,
 }
 
 local Heroes: { [string]: Hero } = {
@@ -51,7 +54,7 @@ local Heroes: { [string]: Hero } = {
 		Title = "Frost Oracle",
 		Color = Color3.fromRGB(150, 210, 255),
 		Passive = "Shatter: frozen zombies take +50% damage and burst when killed",
-		Shatter = { Radius = 7, Damage = 0.5 }, -- blast when a frozen zombie dies
+		Shatter = { Radius = 7, Damage = 0.4 }, -- blast when a frozen zombie dies (was 0.5)
 		Ability = {
 			Name = "Glacial Lance",
 			Desc = "Piercing ice spear where you aim: damages the whole line and freezes survivors",
@@ -64,18 +67,71 @@ local Heroes: { [string]: Hero } = {
 		Ultimate = {
 			Name = "Absolute Zero",
 			Desc = "A blizzard follows you: everything inside is battered and frozen",
-			Duration = 6,
+			-- nerfed after playtest ("too broken"): was 6s / r18 / 0.2 dmg / 1.2s freeze
+			Duration = 5,
 			Interval = 0.5,
-			Radius = 18,
-			Damage = 0.2, -- per pulse
-			Freeze = 1.2,
+			Radius = 14,
+			Damage = 0.12, -- per pulse
+			Freeze = 0.9,
 		},
+	},
+}
+
+-- Co-op roles (up to 4 players): Ren = melee damage, Yuki = crowd control,
+-- Kaida = tank, Mio = support.
+Heroes.Tank = {
+	Id = "Tank",
+	Name = "Kaida",
+	Title = "Iron Bastion",
+	Color = Color3.fromRGB(255, 170, 70),
+	Passive = "Takes 25% less damage",
+	DamageTakenMult = 0.75,
+	Ability = {
+		Name = "War Cry",
+		Desc = "Zombies nearby come for you, and you take half damage meanwhile",
+		Cooldown = 14,
+		Radius = 35,
+		Duration = 5,
+		DamageTakenMult = 0.5, -- on top of the passive while it lasts
+	},
+	Ultimate = {
+		Name = "Fortress",
+		Desc = "A dome zombies can't enter; everyone inside heals",
+		Duration = 8,
+		Radius = 12,
+		HealPerSecond = 15,
+	},
+}
+
+Heroes.Medic = {
+	Id = "Medic",
+	Name = "Mio",
+	Title = "Spirit Warden",
+	Color = Color3.fromRGB(140, 255, 190),
+	Passive = "Mending Aura: allies near you (and you) slowly heal at all times",
+	Aura = { Radius = 22, HealPerSecond = 4 },
+	Ability = {
+		Name = "Spirit Pulse",
+		Desc = "Heal everyone near you and give them a burst of speed",
+		Cooldown = 12,
+		Radius = 25,
+		Heal = 50,
+		HasteMult = 1.3,
+		HasteTime = 4,
+	},
+	Ultimate = {
+		Name = "Kitsune Guardian",
+		Desc = "A spirit fox fights beside you, zapping the nearest zombie",
+		Duration = 10,
+		Interval = 0.3,
+		Range = 45,
+		Damage = 0.35, -- per zap
 	},
 }
 
 local HeroConfig = {
 	Heroes = Heroes,
-	Order = { "Swordsman", "Mage" },
+	Order = { "Swordsman", "Mage", "Tank", "Medic" },
 	Default = "Swordsman",
 	Ult = {
 		Max = 100,

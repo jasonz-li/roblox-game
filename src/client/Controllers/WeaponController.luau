@@ -458,7 +458,8 @@ local function update(dt)
 	local sc = GameConfig.Stamina
 	local staminaMult = ProgressionConfig.StaminaMult(player) -- Second Wind upgrade
 	local maxStamina = sc.Max * staminaMult
-	local speedMult = PerkConfig.SpeedMultiplier(player) * ProgressionConfig.AdrenalineMult(player)
+	local haste = (player:GetAttribute("HasteUntil") or 0) > workspace:GetServerTimeNow() and (player:GetAttribute("HasteMult") or 1) or 1 -- Mio's Spirit Pulse
+	local speedMult = PerkConfig.SpeedMultiplier(player) * ProgressionConfig.AdrenalineMult(player) * haste
 	-- (reloading no longer cancels sprint: you can run and reload at the same time)
 	local wantsSprint = sprintHeld and isMoving(hum) and not adsHeld and not triggerHeld and not exhausted and stamina > 0
 	if wantsSprint then

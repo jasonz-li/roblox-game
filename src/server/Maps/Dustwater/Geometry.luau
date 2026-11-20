@@ -222,9 +222,30 @@ return function(api)
 	api.box("Dresser", V(66, 0, 116), V(71, 4, 119), WOOD, "Wood")
 	api.box("Bookshelf", V(36, 0, 128), V(38, 8, 136), WOOD, "Wood")
 	api.box("EastHousePorch", V(31, 0, 137), V(35, 0.6, 149), C(140, 110, 80), "WoodPlanks")
-	-- Closed front doors (dressing on the sealed houses)
-	panel(api, "z", -35, 1, 136, 142, 0, 7.5, C(110, 70, 50), "WoodPlanks")
-	panel(api, "z", 35, -1, 140, 146, 0, 7.5, C(110, 70, 50), "WoodPlanks")
+	-- Barricaded front doors on the sealed houses: a dark door, rough planks nailed
+	-- across the frame, and junk piled against it (the town boarded itself in).
+	local function barricade(faceX, sign, z0, z1)
+		panel(api, "z", faceX, sign, z0, z1, 0, 7.5, C(60, 42, 32), "WoodPlanks") -- the door
+		panel(api, "z", faceX, sign, z0 - 0.4, z1 + 0.4, 7.5, 8.1, TRIM, "SmoothPlastic") -- frame top
+		local x = faceX + sign * 0.35
+		local zc = (z0 + z1) / 2
+		local len = (z1 - z0) + 1.6
+		for i, b in { { 1.6, 14 }, { 3.6, -10 }, { 5.4, 8 }, { 6.8, -16 } } do
+			api.part({
+				Name = "BarricadePlank",
+				Size = V(0.25, 0.75, len),
+				CFrame = CFrame.new(x + sign * 0.05 * i, b[1], zc) * CFrame.Angles(math.rad(b[2]), 0, 0),
+				Color = C(120 + i * 6, 88 + i * 4, 58),
+				Material = "WoodPlanks",
+				CanCollide = false,
+			})
+		end
+		-- debris pile at the foot of the door
+		api.part({ Name = "BarricadeDebris", Size = V(1.6, 1.2, 2.4), CFrame = CFrame.new(x + sign * 1.1, 0.6, zc - 1.2) * CFrame.Angles(0, math.rad(20), math.rad(8)), Color = C(90, 70, 52), Material = "Wood" })
+		api.part({ Name = "BarricadeDebris", Size = V(1.2, 0.8, 1.6), CFrame = CFrame.new(x + sign * 1.0, 0.4, zc + 1.6) * CFrame.Angles(0, math.rad(-35), 0), Color = C(70, 66, 62), Material = "Metal" })
+	end
+	barricade(-35, 1, 136, 142)
+	barricade(35, -1, 140, 146)
 	-- Fill the dead strips between the houses and the Elm Lane cliffs (x ±70..75):
 	-- rock spurs off the cliff, so there's no hidden corner to get trapped in.
 	api.box("CliffSpurW", V(-75, 0, 112), V(-69.5, 18, 168), C(120, 92, 70), "Rock")
