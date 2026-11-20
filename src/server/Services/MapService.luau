@@ -888,6 +888,32 @@ local function pickNear(list, getPos, roots, maxNear)
 	return scored[math.random(1, math.min(3, #scored))][1]
 end
 
+-- Spawn rotation (zombies-style): each entry point rests between uses, and picks are
+-- weighted toward the points that have been idle longest, so zombies arrive spread
+-- around you instead of in one clump.
+local WINDOW_COOLDOWN = 4 -- seconds before the same window is used again
+local GROUND_COOLDOWN = 2.5
+local MAX_AT_WINDOW = 2 -- zombies allowed outside one window at once
+local lastUsed = {} -- [Instance] = os.clock()
+local occupancy -- function(barrier) -> zombies queued outside it (set by EnemyService)
+
+local function rotate(list, now)
+	local total, weights = 0, {}
+	for i, c in list do
+		local idle = math.min(12, now - (lastUsed[c] or 0))
+		weights[i] = 1 + idle
+		total += weights[i]
+	end
+	local r = math.random() * total
+	for i, c in list do
+		r -= weights[i]
+		if r <= 0 then
+			return c
+		end
+	end
+	return list[#list]
+end
+
 -- Where the next zombie comes from: a boarded window (most of the time) or a ground spawn.
 -- Returns { pos: Vector3, barrier: BasePart? , emerge: boolean }
 function MapService.GetEnemySpawn(groundOnly: boolean?)
@@ -906,32 +932,51 @@ function MapService.GetEnemySpawn(groundOnly: boolean?)
 			end
 		end
 	end
+	local now = os.clock()
 	-- Windows are only used when one is actually near a player. (Before, with no window
 	-- in range, it picked a random window anywhere: underground, 75% of zombies spawned
 	-- at far-off windows and the lab felt empty.) Otherwise: ground spawns near you.
+	-- A window is skipped while it's on cooldown or already has MAX_AT_WINDOW zombies
+	-- queued outside it, so a horde never pours out of one window.
 	local nearBarriers = {}
 	if not groundOnly then
 		for _, b in barriers do
 			local d = nearestDist(roots, b:GetAttribute("Inside"))
-			if d >= 22 and d <= 110 then
+			local queued = occupancy and occupancy(b) or 0
+			if d >= 22 and d <= 110 and queued < MAX_AT_WINDOW and now - (lastUsed[b] or 0) >= WINDOW_COOLDOWN then
 				table.insert(nearBarriers, b)
 			end
 		end
 	end
 	local useBarrier = #nearBarriers > 0 and (#grounds == 0 or math.random() < GameConfig.Barrier.BarrierSpawnChance)
 	if useBarrier then
-		local b = nearBarriers[math.random(1, #nearBarriers)]
+		local b = rotate(nearBarriers, now)
+		lastUsed[b] = now
 		local out = b:GetAttribute("Outside")
 		local side = (b:GetAttribute("Inside") - out).Unit:Cross(Vector3.yAxis)
 		return { pos = out - Vector3.new(0, 3, 0) + side * math.random(-15, 15) / 10, barrier = b, emerge = false }
 	end
-	local s = pickNear(grounds, function(x)
+	-- Ground spawns: near ones that are off cooldown, rotated; else the usual fallback.
+	local fresh = {}
+	for _, s in grounds do
+		local d = nearestDist(roots, s.Position)
+		if d >= 22 and d <= 85 and now - (lastUsed[s] or 0) >= GROUND_COOLDOWN then
+			table.insert(fresh, s)
+		end
+	end
+	local s = #fresh > 0 and rotate(fresh, now) or pickNear(grounds, function(x)
 		return x.Position
 	end, roots, 85)
 	if not s then
 		return nil
 	end
+	lastUsed[s] = now
 	return { pos = s.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3)), barrier = nil, emerge = true }
+end
+
+-- EnemyService tells us how many zombies are queued outside a window.
+function MapService.SetWindowOccupancy(fn)
+	occupancy = fn
 end
 
 -- Back-compat helper

@@ -83,11 +83,12 @@ local function runWave()
 	local eliteChance = ProgressionConfig.EliteChance(wave)
 	local cap = math.min(EnemyConfig.MaxAlive, WaveConfig.AliveCap(escorts) + (isBossWave and 1 or 0))
 	EnemyService.SetHunting(false)
+	task.wait(WaveConfig.WaveStartDelay)
 	while spawned < escorts and not gameOver and not bossDown do
 		if EnemyService.AliveCount() < cap then
 			if EnemyService.Spawn("Shambler", wave, { elite = math.random() < eliteChance }) then
 				spawned += 1
-				task.wait(interval)
+				task.wait(interval * (0.75 + math.random() * 0.5)) -- ±25% jitter
 			else
 				task.wait(0.5) -- no valid spawn right now; try again shortly
 			end

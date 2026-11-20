@@ -47,9 +47,15 @@ end
 -- Last N zombies of a wave (nothing left to spawn) go into hunt mode.
 WaveConfig.HuntWhenRemaining = 3
 
--- Seconds between spawns while below the alive cap.
+-- Seconds between spawns while below the alive cap: a zombies-style trickle that
+-- speeds up each wave (a bit faster than classic pacing). WaveService adds ±25%
+-- jitter so arrivals don't feel mechanical.
+--   wave 1: 1.5s   wave 5: 1.06s   wave 10: 0.51s
 function WaveConfig.SpawnInterval(wave: number): number
-	return math.max(0.3, 1.1 - 0.08 * wave)
+	return math.max(0.45, 1.5 - 0.11 * (wave - 1))
 end
+
+-- Quiet beat at the start of each wave before the first zombie arrives.
+WaveConfig.WaveStartDelay = 2
 
 return WaveConfig

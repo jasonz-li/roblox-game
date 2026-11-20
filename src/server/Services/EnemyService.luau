@@ -1061,6 +1061,17 @@ function EnemyService.Init()
 end
 
 function EnemyService.Start()
+	-- Zombies still outside a window (tearing boards) count toward its queue limit
+	MapService.SetWindowOccupancy(function(barrier)
+		local n = 0
+		for _, data in enemies do
+			if data.barrier == barrier and not data.dead then
+				n += 1
+			end
+		end
+		return n
+	end)
+
 	task.spawn(function()
 		local last = os.clock()
 		while true do
