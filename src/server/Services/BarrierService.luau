@@ -111,7 +111,10 @@ end
 -- server rebuilds one board every RepairInterval on the nearest damaged window within
 -- REPAIR_RANGE of them. Where they look doesn't matter: you can turn around and shoot
 -- while repairing. (The old ProximityPrompt hold cancelled when you looked away.)
-local REPAIR_RANGE = 9
+-- Measured from the window's INSIDE point (where zombies land), not the wall center:
+-- you can stand back a few steps and shoot while repairing. (9 from the wall center
+-- meant one step back cut the repair off.)
+local REPAIR_RANGE = 12
 local repairing = {} -- [Player] = token
 
 local function nearestDamaged(player: Player): BasePart?
@@ -124,7 +127,8 @@ local function nearestDamaged(player: Player): BasePart?
 	local best, bestD = nil, REPAIR_RANGE
 	for _, b in CollectionService:GetTagged("Barrier") do
 		if b.Parent and (b:GetAttribute("Boards") or 0) < (b:GetAttribute("MaxBoards") or 0) then
-			local d = Vector3.new(root.Position.X - b.Position.X, (root.Position.Y - b.Position.Y) * 0.5, root.Position.Z - b.Position.Z).Magnitude
+			local at = b:GetAttribute("Inside") or b.Position
+			local d = Vector3.new(root.Position.X - at.X, (root.Position.Y - at.Y) * 0.5, root.Position.Z - at.Z).Magnitude
 			if d <= bestD then
 				best, bestD = b, d
 			end
@@ -170,12 +174,13 @@ local function setup(barrier: BasePart)
 			return
 		end
 		-- The prompt is only a label now ("Hold E"): repairs come from the RepairHold
-		-- remote, so the prompt itself must not grab the E key.
-		prompt.KeyboardKeyCode = Enum.KeyCode.Unknown
-		prompt.GamepadKeyCode = Enum.KeyCode.Unknown
+		-- remote (held E, position based). It keeps the E key so Roblox can draw it
+		-- (a "None" key made the prompt fail to render, so windows showed no prompt);
+		-- its own instant trigger does nothing for barriers.
+		prompt.KeyboardKeyCode = Enum.KeyCode.E
 		prompt.ClickablePrompt = false
 		prompt.HoldDuration = 0
-		prompt.MaxActivationDistance = REPAIR_RANGE
+		prompt.MaxActivationDistance = REPAIR_RANGE + 4 -- the prompt sits on the wall, a few studs behind the inside point
 		refreshPrompt(barrier)
 	end)
 end
