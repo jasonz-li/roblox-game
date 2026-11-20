@@ -25,7 +25,7 @@ local mapFolder: Folder
 local unlocked = {}
 local notify: RemoteEvent
 
-local CLIP_TOP = 60 -- player-clip volumes reach this height (well above any jump)
+local CLIP_TOP = 90 -- player-clip volumes reach this height (well above any jump)
 
 -- Collision groups used by the map. Registered here because MapService initializes first.
 local function setupCollisionGroups()

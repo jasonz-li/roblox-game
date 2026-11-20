@@ -50,6 +50,30 @@ local function weldedPart(model, root, name, size, offset, color, material)
 	return p
 end
 
+-- Limbs hang on Motor6Ds (pivot = shoulder/hip) so clients can swing them while the
+-- zombie walks (EffectsController sets Motor6D.Transform locally; nothing replicates).
+local function jointedPart(model, root, name, size, pivot: CFrame, partFromPivot: CFrame, color)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = root.CFrame * pivot * partFromPivot
+	p.Color = color
+	p.Material = Enum.Material.SmoothPlastic
+	p.CanCollide = false
+	p.Massless = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	local m = Instance.new("Motor6D")
+	m.Name = name .. "Joint"
+	m.Part0 = root
+	m.Part1 = p
+	m.C0 = pivot
+	m.C1 = partFromPivot:Inverse()
+	m.Parent = root
+	p.Parent = model
+	return p
+end
+
 local function buildModel(stats, position: Vector3): Model
 	local model = Instance.new("Model")
 	model.Name = stats.DisplayName
@@ -67,10 +91,11 @@ local function buildModel(stats, position: Vector3): Model
 	local cloth = Color3.fromRGB(60, 52, 70)
 	weldedPart(model, root, "Torso", Vector3.new(2, 2, 1), CFrame.new(), cloth)
 	local head = weldedPart(model, root, "Head", Vector3.new(1.3, 1.3, 1.3), CFrame.new(0, 1.65, 0), skin)
-	weldedPart(model, root, "LeftArm", Vector3.new(0.6, 0.6, 1.9), CFrame.new(-1.3, 0.6, -0.8), skin)
-	weldedPart(model, root, "RightArm", Vector3.new(0.6, 0.6, 1.9), CFrame.new(1.3, 0.6, -0.8), skin)
-	weldedPart(model, root, "LeftLeg", Vector3.new(0.8, 2, 0.8), CFrame.new(-0.5, -2, 0), cloth)
-	weldedPart(model, root, "RightLeg", Vector3.new(0.8, 2, 0.8), CFrame.new(0.5, -2, 0), cloth)
+	-- arms reach forward from the shoulder; legs hang from the hip
+	jointedPart(model, root, "LeftArm", Vector3.new(0.6, 0.6, 1.9), CFrame.new(-1.3, 0.6, 0.15), CFrame.new(0, 0, -0.95), skin)
+	jointedPart(model, root, "RightArm", Vector3.new(0.6, 0.6, 1.9), CFrame.new(1.3, 0.6, 0.15), CFrame.new(0, 0, -0.95), skin)
+	jointedPart(model, root, "LeftLeg", Vector3.new(0.8, 2, 0.8), CFrame.new(-0.5, -1, 0), CFrame.new(0, -1, 0), cloth)
+	jointedPart(model, root, "RightLeg", Vector3.new(0.8, 2, 0.8), CFrame.new(0.5, -1, 0), CFrame.new(0, -1, 0), cloth)
 	-- Glowing eyes (child of head so they count as head hits)
 	for _, x in { -0.3, 0.3 } do
 		local eye = Instance.new("Part")
@@ -257,7 +282,7 @@ local function despawn(data, hitDir: Vector3?, isHeadshot: boolean?)
 		data.humanoid:Destroy()
 	end
 	for _, d in model:GetDescendants() do
-		if d:IsA("WeldConstraint") then
+		if d:IsA("WeldConstraint") or d:IsA("Motor6D") then
 			d:Destroy()
 		end
 	end
@@ -490,6 +515,20 @@ local function aiTick(dt: number)
 		local targetRoot = target.HumanoidRootPart
 		local targetPos = targetRoot.Position
 
+		-- No jumping in a crowd around a player: jumps there land zombies on heads
+		-- (the "floating" zombies). Path jumps far away still work.
+		local near = dist < 12
+		if near ~= data.noJump then
+			data.noJump = near
+			hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, not near)
+		end
+		-- Somehow on top of a player anyway: shove it off sideways.
+		local flatOff = Vector3.new(root.Position.X - targetPos.X, 0, root.Position.Z - targetPos.Z)
+		if root.Position.Y - targetPos.Y > 2.5 and flatOff.Magnitude < 3 then
+			local away = flatOff.Magnitude > 0.1 and flatOff.Unit or Vector3.new(1, 0, 0)
+			root.AssemblyLinearVelocity = away * 22 + Vector3.new(0, -8, 0)
+		end
+
 		-- Periodic groans so players can hear where the horde is (runners are noisier).
 		if now >= data.nextGroan then
 			playSound(data, "ZombieGroan")
@@ -533,7 +572,8 @@ local function aiTick(dt: number)
 		if moved < hum.WalkSpeed * dt * 0.2 then
 			data.stuckTime += dt
 			if data.stuckTime > 1.2 then
-				hum.Jump = true
+				-- pressed against the player's crowd isn't "stuck": never jump there
+				hum.Jump = not near
 				data.waypoints = nil
 				data.lastPathTime = 0
 				data.stuckTime = 0

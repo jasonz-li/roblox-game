@@ -162,8 +162,58 @@ local function startFlicker()
 	end)
 end
 
+-- Procedural zombie walk cycle: swings the limb Motor6Ds (made by EnemyService) by
+-- each zombie's speed. Local only, so it costs no network traffic.
+local function startZombieWalk()
+	local CollectionService = game:GetService("CollectionService")
+	local RunService = game:GetService("RunService")
+	local phases = setmetatable({}, { __mode = "k" })
+	RunService.RenderStepped:Connect(function(dt)
+		local cam = workspace.CurrentCamera
+		local camPos = cam and cam.CFrame.Position or Vector3.zero
+		for _, model in CollectionService:GetTagged("Enemy") do
+			local root = model:IsA("Model") and model.PrimaryPart
+			if not root then
+				continue
+			end
+			if (root.Position - camPos).Magnitude > 160 then
+				continue
+			end
+			local v = root.AssemblyLinearVelocity
+			local speed = Vector3.new(v.X, 0, v.Z).Magnitude
+			local st = phases[model]
+			if not st then
+				st = { phase = math.random() * 6.28, amp = 0 }
+				phases[model] = st
+			end
+			-- stride rate and size grow with speed (runners take big, fast strides)
+			local targetAmp = math.clamp(speed / 18, 0, 1)
+			st.amp += (targetAmp - st.amp) * math.min(1, dt * 10)
+			st.phase += dt * (4 + speed * 0.45)
+			local s = math.sin(st.phase)
+			local legA = s * 0.85 * st.amp
+			local armA = -s * 0.25 * st.amp + math.sin(st.phase * 0.5) * 0.06
+			local lj, rj = root:FindFirstChild("LeftLegJoint"), root:FindFirstChild("RightLegJoint")
+			local la, ra = root:FindFirstChild("LeftArmJoint"), root:FindFirstChild("RightArmJoint")
+			if lj then
+				lj.Transform = CFrame.Angles(legA, 0, 0)
+			end
+			if rj then
+				rj.Transform = CFrame.Angles(-legA, 0, 0)
+			end
+			if la then
+				la.Transform = CFrame.Angles(armA, 0, 0)
+			end
+			if ra then
+				ra.Transform = CFrame.Angles(-armA, 0, 0)
+			end
+		end
+	end)
+end
+
 function EffectsController.Start()
 	startFlicker()
+	startZombieWalk()
 	Remotes.Get("ShotFx").OnClientEvent:Connect(function(_shooter, origin, endPos, weaponId, upgraded)
 		if typeof(origin) == "Vector3" and typeof(endPos) == "Vector3" then
 			local stats = typeof(weaponId) == "string" and WeaponConfig.Get(weaponId, upgraded == true)

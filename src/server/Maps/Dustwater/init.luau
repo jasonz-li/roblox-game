@@ -25,7 +25,7 @@ local ROCK = Color3.fromRGB(120, 92, 70)
 return {
 	Name = "Dustwater (greybox v2)",
 	OwnGround = true,
-	WallHeight = 14,
+	WallHeight = 28,
 	WallColor = Color3.fromRGB(176, 150, 118),
 
 	Lighting = {
@@ -50,12 +50,12 @@ return {
 	-- Boundary walls (axis = the direction the wall RUNS; at = its fixed coordinate)
 	Walls = {
 		-- Cliffs around the town
-		{ axis = "x", at = -112, from = -260, to = 300, height = 32, color = ROCK, material = "Rock", name = "Cliff" },
-		{ axis = "z", at = -260, from = -112, to = 90, height = 32, color = ROCK, material = "Rock", name = "Cliff" },
-		{ axis = "z", at = 300, from = -112, to = 90, height = 32, color = ROCK, material = "Rock", name = "Cliff" },
-		{ axis = "z", at = -100, from = 90, to = 225, height = 32, color = ROCK, material = "Rock", name = "Cliff" },
-		{ axis = "z", at = 100, from = 90, to = 225, height = 32, color = ROCK, material = "Rock", name = "Cliff" },
-		{ axis = "x", at = 225, from = -100, to = 100, height = 32, color = ROCK, material = "Rock", name = "Cliff" },
+		{ axis = "x", at = -112, from = -260, to = 300, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
+		{ axis = "z", at = -260, from = -112, to = 90, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
+		{ axis = "z", at = 300, from = -112, to = 90, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
+		{ axis = "z", at = -100, from = 90, to = 225, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
+		{ axis = "z", at = 100, from = 90, to = 225, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
+		{ axis = "x", at = 225, from = -100, to = 100, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
 		-- Town's south edge; Elm Lane barricade gap = D1
 		{ axis = "x", at = 90, from = -260, to = 300, gaps = { { -14, 14 } } },
 		-- Gas Station | Main Street (D2 road, D2b back gate into the field)
@@ -121,17 +121,17 @@ return {
 	-- boards off, then climb in. Axis/At must match a wall line in `Walls` (the gap is cut
 	-- automatically). Along = position along that wall; Inward = direction into play space.
 	Barriers = {
-		{ Zone = 0, Axis = "z", At = -100, Along = 150, Inward = V(1, 0, 0), WallHeight = 32 },
-		{ Zone = 0, Axis = "z", At = 100, Along = 130, Inward = V(-1, 0, 0), WallHeight = 32 },
-		{ Zone = 0, Axis = "x", At = 225, Along = -40, Inward = V(0, 0, -1), WallHeight = 32 },
-		{ Zone = 0, Axis = "x", At = 225, Along = 50, Inward = V(0, 0, -1), WallHeight = 32 },
-		{ Zone = 1, Axis = "x", At = 90, Along = -125, Inward = V(0, 0, -1), WallHeight = 14 },
-		{ Zone = 1, Axis = "x", At = 90, Along = 145, Inward = V(0, 0, -1), WallHeight = 14 },
-		{ Zone = 2, Axis = "z", At = -260, Along = -60, Inward = V(1, 0, 0), WallHeight = 32 },
-		{ Zone = 2, Axis = "z", At = -260, Along = 40, Inward = V(1, 0, 0), WallHeight = 32 },
-		{ Zone = 2, Axis = "x", At = -112, Along = -200, Inward = V(0, 0, 1), WallHeight = 32 },
-		{ Zone = 3, Axis = "x", At = -112, Along = -40, Inward = V(0, 0, 1), WallHeight = 32 },
-		{ Zone = 3, Axis = "x", At = -112, Along = 20, Inward = V(0, 0, 1), WallHeight = 32 },
+		{ Zone = 0, Axis = "z", At = -100, Along = 150, Inward = V(1, 0, 0), WallHeight = 56 },
+		{ Zone = 0, Axis = "z", At = 100, Along = 130, Inward = V(-1, 0, 0), WallHeight = 56 },
+		{ Zone = 0, Axis = "x", At = 225, Along = -40, Inward = V(0, 0, -1), WallHeight = 56 },
+		{ Zone = 0, Axis = "x", At = 225, Along = 50, Inward = V(0, 0, -1), WallHeight = 56 },
+		{ Zone = 1, Axis = "x", At = 90, Along = -125, Inward = V(0, 0, -1), WallHeight = 28 },
+		{ Zone = 1, Axis = "x", At = 90, Along = 145, Inward = V(0, 0, -1), WallHeight = 28 },
+		{ Zone = 2, Axis = "z", At = -260, Along = -60, Inward = V(1, 0, 0), WallHeight = 56 },
+		{ Zone = 2, Axis = "z", At = -260, Along = 40, Inward = V(1, 0, 0), WallHeight = 56 },
+		{ Zone = 2, Axis = "x", At = -112, Along = -200, Inward = V(0, 0, 1), WallHeight = 56 },
+		{ Zone = 3, Axis = "x", At = -112, Along = -40, Inward = V(0, 0, 1), WallHeight = 56 },
+		{ Zone = 3, Axis = "x", At = -112, Along = 20, Inward = V(0, 0, 1), WallHeight = 56 },
 	},
 
 	-- Boss arena (Milestone 5): the widest stretch of Main Street, 3 exits.

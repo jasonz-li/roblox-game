@@ -128,6 +128,11 @@ local function storefront(api, name, minX, minZ, maxX, frontZ, height, color, wi
 		if not skip then
 			panel(api, "x", frontZ + 0.5, 1, x, x + 5, 12, 15.5, C(35, 40, 48), "Glass", { Transparency = 0.1 })
 			panel(api, "x", frontZ + 0.5, 1, x - 0.3, x + 5.3, 11.7, 12, TRIM, "SmoothPlastic")
+			if height >= 26 then -- third storey
+				local lit = (x * 7) % 5 == 0 -- the odd window still has a light on
+				panel(api, "x", frontZ + 0.5, 1, x, x + 5, 20, 23.5, lit and C(255, 190, 110) or C(35, 40, 48), lit and "Neon" or "Glass", { Transparency = lit and 0.35 or 0.1 })
+				panel(api, "x", frontZ + 0.5, 1, x - 0.3, x + 5.3, 19.7, 20, TRIM, "SmoothPlastic")
+			end
 		end
 		x += 10
 	end
@@ -257,7 +262,7 @@ return function(api)
 	-- Zone 1: Main Street — storefront blocks, theater, street, field + junkyard
 	------------------------------------------------------------------
 	-- Hardware store (A1): front face at z = -40 (wall centered at -40.5)
-	storefront(api, "A1_Hardware", -150, -84, -96, -40.5, 18, STUCCO, {
+	storefront(api, "A1_Hardware", -150, -84, -96, -40.5, 28, STUCCO, {
 		{ side = "s", from = -146, to = -128, bottom = 1.5, height = 6.5, glass = true },
 		{ side = "s", from = -114, to = -100, bottom = 1.5, height = 6.5, glass = true },
 	})
@@ -266,7 +271,7 @@ return function(api)
 	api.box("A1_Sign", V(-146, 10.2, -40.2), V(-100, 11.6, -39.8), C(200, 180, 120), "SmoothPlastic")
 
 	-- Shops (A2): two shops split by a partition; shotgun wall-buy sits on the pier at x -60
-	storefront(api, "A2_Shops", -88, -84, -24, -40.5, 18, STUCCO2, {
+	storefront(api, "A2_Shops", -88, -84, -24, -40.5, 32, STUCCO2, {
 		{ side = "s", from = -84, to = -66, bottom = 1.5, height = 6.5, glass = true },
 		{ side = "s", from = -52, to = -30, bottom = 1.5, height = 6.5, glass = true },
 	}, { { -64, -56 } })
@@ -275,7 +280,7 @@ return function(api)
 	api.box("A2_Counter", V(-50, 0, -54), V(-36, 3.5, -51), WOOD, "Wood")
 
 	-- Theater (C): tall brick front, recessed glass doors, box office, marquee, blade sign
-	api.shell("C_Theater", 36, -84, 170, -40.5, 0, 22, {
+	api.shell("C_Theater", 36, -84, 170, -40.5, 0, 34, {
 		color = BRICK, material = "Brick",
 		openings = {
 			{ side = "s", from = 88, to = 104, bottom = 0.2, height = 8, glass = true }, -- lobby doors (glass, closed)
@@ -602,5 +607,96 @@ return function(api)
 	api.box("Gurney", V(-16, -20, -86), V(-8, -17.4, -82), C(200, 200, 205), "Metal")
 	for _, p in { V(255, -9, -70), V(200, -10.4, -70), V(150, -10.4, -70), V(100, -10.4, -70), V(15, -6.4, -78), V(-10, -6.4, -62), V(-40, -2, -94) } do
 		light(api, p, C(140, 255, 180), 24)
+	end
+
+	------------------------------------------------------------------
+	-- Skyline: jagged cliff tops, landmarks past the cliffs, distant mesas.
+	-- All outside the playable area and non-collidable (pure silhouette).
+	------------------------------------------------------------------
+	local deco = { CanCollide = false, CanQuery = false, CanTouch = false }
+	local function rnd(seed) -- deterministic 0..1
+		local x = math.sin(seed * 12.9898) * 43758.5453
+		return x - math.floor(x)
+	end
+	-- Rock spires along each cliff line, pushed outward so they never overhang the town
+	local CLIFF_TOP = 56
+	local cliffs = {
+		{ axis = "x", at = -112, from = -260, to = 300, out = -1 },
+		{ axis = "z", at = -260, from = -112, to = 90, out = -1 },
+		{ axis = "z", at = 300, from = -112, to = 90, out = 1 },
+		{ axis = "z", at = -100, from = 90, to = 225, out = -1 },
+		{ axis = "z", at = 100, from = 90, to = 225, out = 1 },
+		{ axis = "x", at = 225, from = -100, to = 100, out = 1 },
+	}
+	local seed = 0
+	for _, c in cliffs do
+		local s = c.from
+		while s < c.to do
+			seed += 1
+			local w = 10 + rnd(seed) * 14
+			local h = 6 + rnd(seed + 0.5) * 28
+			local depth = 8 + rnd(seed + 0.7) * 10
+			local mid = math.min(s + w / 2, c.to - 2)
+			local off = c.at + c.out * (depth / 2 + 1)
+			local pos = c.axis == "x" and V(mid, CLIFF_TOP + h / 2 - 2, off) or V(off, CLIFF_TOP + h / 2 - 2, mid)
+			local size = c.axis == "x" and V(w, h, depth) or V(depth, h, w)
+			local tilt = (rnd(seed + 0.3) - 0.5) * 0.25
+			api.part({ Name = "CliffSpire", Size = size, CFrame = CFrame.new(pos) * CFrame.Angles(tilt, (rnd(seed + 0.9) - 0.5) * 0.5, -tilt), Color = C(112 + rnd(seed) * 20, 84 + rnd(seed) * 14, 64), Material = "Rock", CanCollide = false, CanQuery = false, CastShadow = false })
+			s += w * 0.8
+		end
+	end
+
+	-- Landmark 1: standing water tower behind Elm Lane (south)
+	local wt = V(40, 0, 262)
+	for _, o in { V(-7, 0, -7), V(7, 0, -7), V(-7, 0, 7), V(7, 0, 7) } do
+		api.part({ Name = "TowerLeg", Size = V(1.6, 62, 1.6), Position = wt + o + V(0, 31, 0), Color = C(120, 118, 110), Material = "Metal", CanCollide = false, CanQuery = false })
+	end
+	api.part({ Name = "WaterTower", Shape = Enum.PartType.Cylinder, Size = V(18, 22, 22), CFrame = CFrame.new(wt + V(0, 71, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = C(170, 168, 155), Material = "CorrodedMetal", CanCollide = false, CanQuery = false })
+	api.part({ Name = "WaterTowerCap", Shape = Enum.PartType.Ball, Size = V(23, 23, 23), Position = wt + V(0, 79, 0), Color = C(140, 70, 55), Material = "CorrodedMetal", CanCollide = false, CanQuery = false })
+	api.box("WaterTowerName", wt + V(-11.2, 68, -6), wt + V(-11, 74, 6), C(60, 40, 35), "SmoothPlastic", deco)
+
+	-- Landmark 2: radio mast behind the motel (north-east) with a blinking beacon
+	local rm = V(250, 0, -175)
+	api.box("RadioMast", rm + V(-1.2, 0, -1.2), rm + V(1.2, 120, 1.2), C(170, 60, 50), "Metal", deco)
+	for y = 20, 110, 30 do
+		api.box("RadioMastBand", rm + V(-1.4, y, -1.4), rm + V(1.4, y + 6, 1.4), C(230, 225, 215), "Metal", deco)
+	end
+	local beacon = api.part({ Name = "MastBeacon", Size = V(2.4, 2.4, 2.4), Position = rm + V(0, 121.5, 0), Color = C(255, 40, 30), Material = "Neon", CanCollide = false, CanQuery = false })
+	pointLight(beacon, C(255, 40, 30), 40, 2)
+	game:GetService("CollectionService"):AddTag(beacon, "Flicker")
+
+	-- Landmark 3: grain silos past the west cliff (behind the gas station)
+	for i, x in { -320, -300, -280 } do
+		local h = 70 + i * 6
+		api.part({ Name = "Silo", Shape = Enum.PartType.Cylinder, Size = V(h, 16, 16), CFrame = CFrame.new(x, h / 2, -30 + i * 4) * CFrame.Angles(0, 0, math.rad(90)), Color = C(185, 180, 170), Material = "CorrodedMetal", CanCollide = false, CanQuery = false, CastShadow = false })
+		api.part({ Name = "SiloCap", Shape = Enum.PartType.Ball, Size = V(16.5, 16.5, 16.5), Position = V(x, h, -30 + i * 4), Color = C(150, 145, 140), Material = "CorrodedMetal", CanCollide = false, CanQuery = false, CastShadow = false })
+	end
+	api.box("SiloGantry", V(-322, 64, -25), V(-278, 67, -20), C(110, 105, 100), "Metal", deco)
+
+	-- Desert floor all around the town (a frame, so the ramp holes stay open)
+	local DESERT = C(186, 146, 100)
+	api.box("DesertN", V(-900, -1, -900), V(900, 0, -112), DESERT, "Sand", deco)
+	api.box("DesertS", V(-900, -1, 225), V(900, 0, 900), DESERT, "Sand", deco)
+	api.box("DesertW", V(-900, -1, -112), V(-260, 0, 225), DESERT, "Sand", deco)
+	api.box("DesertE", V(300, -1, -112), V(900, 0, 225), DESERT, "Sand", deco)
+
+	-- Distant mesas on every side (fade into the fog)
+	local mesas = {
+		{ V(-150, 0, -330), V(220, 110, 90) },
+		{ V(120, 0, -380), V(260, 150, 100) },
+		{ V(420, 0, -120), V(100, 120, 240) },
+		{ V(460, 0, 140), V(120, 90, 200) },
+		{ V(-440, 0, 60), V(110, 130, 260) },
+		{ V(-380, 0, -260), V(160, 95, 120) },
+		{ V(-200, 0, 380), V(240, 100, 110) },
+		{ V(220, 0, 420), V(200, 140, 120) },
+	}
+	for i, m in mesas do
+		local pos, size = m[1], m[2]
+		local col = C(120, 80, 60):Lerp(C(150, 95, 70), rnd(i))
+		api.part({ Name = "Mesa", Size = size, Position = pos + V(0, size.Y / 2, 0), Color = col, Material = "Rock", CanCollide = false, CanQuery = false, CastShadow = false })
+		-- stepped cap + talus skirt so the silhouette isn't a box
+		api.part({ Name = "MesaCap", Size = V(size.X * 0.7, size.Y * 0.18, size.Z * 0.75), Position = pos + V(size.X * 0.08, size.Y * 1.09, 0), Color = col:Lerp(C(90, 60, 45), 0.3), Material = "Rock", CanCollide = false, CanQuery = false, CastShadow = false })
+		api.part({ Name = "MesaSkirt", Size = V(size.X * 1.3, size.Y * 0.3, size.Z * 1.25), Position = pos + V(0, size.Y * 0.15, 0), Color = col:Lerp(C(196, 160, 112), 0.35), Material = "Sand", CanCollide = false, CanQuery = false, CastShadow = false })
 	end
 end
