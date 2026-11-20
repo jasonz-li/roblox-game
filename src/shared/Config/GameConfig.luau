@@ -27,6 +27,9 @@ local GameConfig = {
 		WalkSpeed = 16,
 		SprintSpeed = 25,
 		MaxHealth = 100,
+		-- Health regen: after this long without being hit, heal quickly back to full
+		RegenDelay = 3.5,
+		RegenPerSecond = 30, -- empty -> full in ~3.3s
 	},
 
 	-- Sprint stamina (client-side movement; the bar is on the HUD)

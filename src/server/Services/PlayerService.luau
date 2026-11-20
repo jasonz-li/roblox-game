@@ -68,6 +68,30 @@ local function onCharacterAdded(player: Player, character: Model)
 		end
 	end)
 
+	-- Health regen (zombies-style): no healing for RegenDelay after a hit, then fast.
+	-- Replaces Roblox's default slow "Health" script.
+	local defaultRegen = character:FindFirstChild("Health")
+	if defaultRegen and defaultRegen:IsA("Script") then
+		defaultRegen:Destroy()
+	end
+	local cfg = GameConfig.Player
+	local lastHealth, lastHit = humanoid.Health, 0
+	humanoid.HealthChanged:Connect(function(h)
+		if h < lastHealth - 0.01 then
+			lastHit = os.clock()
+		end
+		lastHealth = h
+	end)
+	task.spawn(function()
+		while humanoid.Parent and humanoid.Health > 0 do
+			local dt = task.wait(0.1)
+			if humanoid.Health > 0 and humanoid.Health < humanoid.MaxHealth and os.clock() - lastHit >= cfg.RegenDelay then
+				humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + cfg.RegenPerSecond * dt)
+				lastHealth = humanoid.Health
+			end
+		end
+	end)
+
 	humanoid.Died:Connect(function()
 		PlayerService.PlayerDied:Fire(player)
 		task.defer(checkAllDead)

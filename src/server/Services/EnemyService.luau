@@ -599,7 +599,10 @@ local function aiTick(dt: number)
 		-- Attack
 		if dist <= data.stats.AttackRange then
 			hum:MoveTo(targetPos)
-			if now - data.lastAttack >= data.stats.AttackCooldown then
+			-- Wind-up: the first swing comes a beat after reaching you, so you can react
+			data.inReachSince = data.inReachSince or now
+			local ready = now - data.inReachSince >= (data.stats.AttackWindup or 0)
+			if ready and now - data.lastAttack >= data.stats.AttackCooldown then
 				data.lastAttack = now
 				local targetHum = target:FindFirstChildOfClass("Humanoid")
 				if targetHum and targetHum.Health > 0 then
@@ -609,6 +612,8 @@ local function aiTick(dt: number)
 			end
 			continue
 		end
+
+		data.inReachSince = nil -- out of reach: the next approach winds up again
 
 		-- Movement: straight line if clear, otherwise pathfind around cover.
 		local toTarget = targetPos - root.Position

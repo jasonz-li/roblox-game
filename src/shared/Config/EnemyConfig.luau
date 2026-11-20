@@ -10,6 +10,7 @@ export type EnemyStats = {
 	Damage: number,
 	AttackRange: number,
 	AttackCooldown: number,
+	AttackWindup: number,
 	BodyColor: Color3,
 }
 
@@ -20,9 +21,10 @@ local Enemies: { [string]: EnemyStats } = {
 		BaseHealth = 100,
 		WalkSpeed = 11, -- was 8: still slower than the player's walk (16)
 		RunSpeed = 20, -- was 17: faster than walking, slower than sprinting (25)
-		Damage = 30,
+		Damage = 20, -- 5 hits from full health (was 30 = 3 hits)
 		AttackRange = 4.5,
-		AttackCooldown = 0.9,
+		AttackCooldown = 1.1,
+		AttackWindup = 0.4, -- delay before the first swing once in reach: time to back off or knife
 		BodyColor = Color3.fromRGB(96, 110, 92),
 	},
 }
