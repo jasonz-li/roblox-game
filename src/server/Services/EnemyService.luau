@@ -374,17 +374,59 @@ local function despawn(data, hitDir: Vector3?, isHeadshot: boolean?)
 	end)
 end
 
+-- Current normal speed (base, reduced while slowed by an ability)
+local function normalSpeed(data): number
+	if data.slowUntil and os.clock() < data.slowUntil then
+		return data.baseSpeed * data.slowMult
+	end
+	return data.baseSpeed
+end
+
 -- Brief stagger on non-lethal hits (bigger on headshots) so hits feel like they land.
 local function flinch(data, isHeadshot: boolean?)
 	local hum = data.humanoid
 	data.flinchToken = (data.flinchToken or 0) + 1
 	local token = data.flinchToken
-	hum.WalkSpeed = data.baseSpeed * (isHeadshot and 0.15 or 0.4)
+	hum.WalkSpeed = normalSpeed(data) * (isHeadshot and 0.15 or 0.4)
 	task.delay(isHeadshot and 0.3 or 0.15, function()
 		if not data.dead and data.flinchToken == token then
-			hum.WalkSpeed = data.baseSpeed
+			hum.WalkSpeed = normalSpeed(data)
 		end
 	end)
+end
+
+-- Slow an enemy to `mult` of its speed for `duration` seconds (frost abilities).
+function EnemyService.Slow(data, mult: number, duration: number)
+	if data.dead then
+		return
+	end
+	data.slowMult = math.min(mult, (data.slowUntil and os.clock() < data.slowUntil) and data.slowMult or 1)
+	data.slowUntil = math.max(data.slowUntil or 0, os.clock() + duration)
+	data.humanoid.WalkSpeed = normalSpeed(data)
+	local token = data.slowUntil
+	task.delay(duration + 0.05, function()
+		if not data.dead and data.slowUntil == token then
+			data.slowUntil = nil
+			data.humanoid.WalkSpeed = data.baseSpeed
+		end
+	end)
+end
+
+-- Live enemies whose root is within `radius` of `pos` (optionally only on the XZ plane).
+function EnemyService.InRadius(pos: Vector3, radius: number, flat: boolean?): { any }
+	local list = {}
+	for _, data in enemies do
+		if not data.dead and data.root.Parent then
+			local d = data.root.Position - pos
+			if flat then
+				d = Vector3.new(d.X, d.Y * 0.35, d.Z)
+			end
+			if d.Magnitude <= radius then
+				table.insert(list, data)
+			end
+		end
+	end
+	return list
 end
 
 -- Returns true if this hit killed the enemy. hitDir (optional) = direction of the shot, for knockback.

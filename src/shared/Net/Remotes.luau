@@ -15,6 +15,8 @@ local NAMES = {
 	-- kinds: Points, WaveStart, WaveComplete, GameOver, Message, Sound, PowerUp, DoorOpened,
 	--        UpgradeChosen, Shards, StreakMilestone, RunSummary
 	"ChooseUpgrade", -- C->S  (index: number)  pick from the current upgrade offer
+	"UseAbility", -- C->S  (slot: "Ability" | "Ultimate", aim: Vector3 look direction)
+	"SelectHero", -- C->S  (heroId: string)  between waves only (dev picker until the lobby)
 }
 
 local Remotes = {}

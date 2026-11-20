@@ -47,11 +47,22 @@ wave · all dead → game over → restart · no console errors.
 - Generic `RemoteGuard` rate limiter
 - First real blockout of map 1
 
-## Milestone 3: Heroes and abilities
-- Ability framework (server cooldowns, client prediction of VFX)
-- Ultimate charge
-- 2 heroes fully playable (Swordsman, Mage), placeholder VFX
-- Hero selection (dev menu until the lobby exists)
+## Milestone 3: Heroes and abilities 🚧
+- Ability framework (server cooldowns, client prediction of VFX) — `AbilityService`, `AbilityController`
+- Ultimate charge (kills / headshots / elites)
+- 2 heroes fully playable (Swordsman, Mage), placeholder VFX — Ren (Gale Step / Tempest), Yuki (Frost Nova / Starfall)
+- Hero selection (dev menu until the lobby exists) — H between waves
+
+**Verified (2026-11-20):** hero switch between waves, Frost Nova cast + cooldown,
+recast and uncharged-ultimate rejected, Starfall charge → cast → reset with effects.
+**Not yet verified:** Gale Step dash feel, Tempest, balance.
+
+## Pulled forward (built early, outside milestone order)
+- M5: elite zombies + elite waves (every 5th)
+- M6: pick-1-of-3 upgrade cards every 2 waves (10 stackable upgrades)
+- M7: `DataService` (session locking, autosave, schema) + Spirit Shards from streaks,
+  elites and waves; end-of-run summary
+- Kill streaks with milestone rewards and a streak UAV; CoD-style minimap with radar sweeps
 
 ## Milestone 4: Co-op depth
 - Downed state and hold-to-revive

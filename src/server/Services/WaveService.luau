@@ -17,6 +17,7 @@ local MysteryBoxService = require(script.Parent.MysteryBoxService)
 local PowerUpService = require(script.Parent.PowerUpService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local DataService = require(script.Parent.DataService)
+local AbilityService = require(script.Parent.AbilityService)
 local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 
 local WaveService = {}
@@ -90,6 +91,7 @@ local function resetMatch()
 	MysteryBoxService.Reset()
 	PowerUpService.Reset()
 	ProgressionService.Reset()
+	AbilityService.Reset()
 	CurrencyService.ResetAll()
 	wave = 0
 	gameOver = false

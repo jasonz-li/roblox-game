@@ -20,6 +20,7 @@ local CurrencyService = require(script.Parent.CurrencyService)
 local MapService = require(script.Parent.MapService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
+local HeroConfig = require(game.ReplicatedStorage.Shared.Config.HeroConfig)
 
 local WeaponService = {}
 
@@ -342,7 +343,8 @@ local function onMelee(player: Player, lookDir, claimedPart)
 		return
 	end
 	local instaKill = workspace:GetServerTimeNow() < (gameState:GetAttribute("InstaKillUntil") or 0)
-	local damage = instaKill and best.humanoid.Health or cfg.Damage * ProgressionConfig.KnifeMult(player)
+	local heroKnife = HeroConfig.Get(player:GetAttribute("Hero")).KnifeMult or 1 -- Ren's passive
+	local damage = instaKill and best.humanoid.Health or cfg.Damage * ProgressionConfig.KnifeMult(player) * heroKnife
 	local model, pos = best.model, best.root.Position + Vector3.new(0, 1, 0)
 	local killed = EnemyService.Damage(best, damage, player, false, lookDir)
 	CurrencyService.Add(player, GameConfig.Points.Hit, nil, true)
