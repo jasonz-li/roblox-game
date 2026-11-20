@@ -46,8 +46,42 @@ function DevService.Start()
 		elseif cmd == "points" and p then
 			CurrencyService.Add(p, tonumber(a) or 0, "Dev")
 			return "points"
+		elseif cmd == "spawnprobe" and p then
+			-- move player 1 to `a` (Vector3) and sample where the next 40 zombies would come from
+			local MapService = require(script.Parent.MapService)
+			local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+			if root and typeof(a) == "Vector3" then
+				root.CFrame = CFrame.new(a)
+				task.wait(0.3)
+			end
+			local windows, ground, sumDist, maxDist = 0, 0, 0, 0
+			local here = root and root.Position or Vector3.zero
+			for _ = 1, 40 do
+				local info = MapService.GetEnemySpawn()
+				if info then
+					if info.barrier then
+						windows += 1
+					else
+						ground += 1
+					end
+					local flat = Vector3.new(info.pos.X - here.X, 0, info.pos.Z - here.Z).Magnitude + math.abs(info.pos.Y - here.Y) * 6
+					sumDist += flat
+					maxDist = math.max(maxDist, flat)
+				end
+			end
+			return string.format("windows=%d ground=%d avgWalkDist=%.0f maxWalkDist=%.0f", windows, ground, sumDist / 40, maxDist)
+		elseif cmd == "opendoors" then
+			local MapService = require(script.Parent.MapService)
+			local n = 0
+			for _, d in game:GetService("CollectionService"):GetTagged("Interactable") do
+				if d:GetAttribute("Kind") == "Door" then
+					MapService.OpenDoor(d, nil, true)
+					n += 1
+				end
+			end
+			return "opened " .. n
 		elseif cmd == "killall" then
-			EnemyService.KillAll()
+			EnemyService.KillAll(true)
 			return "killed all"
 		elseif cmd == "wave" then
 			return WaveService.DevSetWave(tonumber(a) or 1)

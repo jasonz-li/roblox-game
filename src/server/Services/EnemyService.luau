@@ -585,6 +585,24 @@ function EnemyService.Slow(data, mult: number, duration: number)
 	end)
 end
 
+-- Area blast (upgrade picks, perks). Damage falls off to half at the edge. Kills are
+-- tagged "blast" (Chain Reaction checks this) and reported through onKill(data).
+function EnemyService.Explode(pos: Vector3, radius: number, damage: number, attacker: Player?, onKill, color: Color3?)
+	for _, data in EnemyService.InRadius(pos, radius) do
+		local d = (data.root.Position - pos).Magnitude
+		local dmg = damage * (1 - 0.5 * math.clamp(d / radius, 0, 1))
+		local away = data.root.Position - pos
+		data.lastHitTag = "blast"
+		local killed = EnemyService.Damage(data, dmg, attacker, false, (away.Magnitude > 0.1 and away.Unit or Vector3.yAxis) + Vector3.new(0, 0.8, 0))
+		if not killed then
+			data.lastHitTag = nil
+		elseif onKill then
+			onKill(data)
+		end
+	end
+	notify:FireAllClients("AbilityFx", { kind = "Explosion", pos = pos, radius = radius, color = color })
+end
+
 -- Set an enemy on fire: `dps` for `duration` seconds (refreshes, doesn't stack).
 -- onKill(data) is called if the fire finishes it, so the shooter gets the credit.
 function EnemyService.Burn(data, dps: number, duration: number, attacker: Player?, onKill)
@@ -668,10 +686,13 @@ function EnemyService.Damage(data, amount: number, attacker: Player?, isHeadshot
 end
 
 -- Nuke: kill every live enemy with no killer (no per-kill points or drops).
-function EnemyService.KillAll()
+-- The Titan survives a Nuke unless includeBoss is set (dev testing).
+function EnemyService.KillAll(includeBoss: boolean?)
 	local list = {}
 	for _, data in enemies do
-		table.insert(list, data)
+		if includeBoss or not data.isBoss then
+			table.insert(list, data)
+		end
 	end
 	for _, data in list do
 		EnemyService.Damage(data, math.huge, nil, false, Vector3.new(math.random() - 0.5, 0, math.random() - 0.5))
@@ -905,7 +926,7 @@ local function aiTick(dt: number)
 					if r and h then
 						local off = Vector3.new(r.Position.X - center.X, 0, r.Position.Z - center.Z)
 						if off.Magnitude <= s.Radius and math.abs(r.Position.Y - center.Y) < 10 then
-							h:TakeDamage(s.Damage * WaveConfig.DamageMultiplier(1))
+							PlayerService.Damage(char, s.Damage * WaveConfig.DamageMultiplier(1))
 							local p = game.Players:GetPlayerFromCharacter(char)
 							if p then
 								local away = off.Magnitude > 0.1 and off.Unit or Vector3.xAxis
@@ -935,7 +956,7 @@ local function aiTick(dt: number)
 				data.lastAttack = now
 				local targetHum = target:FindFirstChildOfClass("Humanoid")
 				if targetHum and targetHum.Health > 0 then
-					targetHum:TakeDamage(data.damage)
+					PlayerService.Damage(target, data.damage)
 					playSound(data, "ZombieAttack")
 				end
 			end

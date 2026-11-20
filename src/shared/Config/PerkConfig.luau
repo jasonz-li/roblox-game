@@ -29,11 +29,30 @@ local Perks: { [string]: Perk } = {
 		Id = "SwiftStep", DisplayName = "Swift Step", Description = "Move speed +12%",
 		Cost = 1500, Color = Color3.fromRGB(80, 200, 255), Letter = "S",
 	},
+	-- Game-changers: strong enough to feel broken, each with a catch.
+	StormCoil = {
+		Id = "StormCoil", DisplayName = "Storm Coil", Description = "Reloading unleashes a lightning nova (emptier mag = bigger)",
+		Cost = 2000, Color = Color3.fromRGB(110, 180, 255), Letter = "C",
+	},
+	Phoenix = {
+		Id = "Phoenix", DisplayName = "Phoenix Draught", Description = "A killing blow revives you in a firestorm (one use)",
+		Cost = 1500, Color = Color3.fromRGB(255, 120, 40), Letter = "P",
+	},
+	PackMule = {
+		Id = "PackMule", DisplayName = "Pack Mule Tonic", Description = "Carry a third weapon [3]",
+		Cost = 3000, Color = Color3.fromRGB(140, 220, 90), Letter = "M",
+	},
+	Hawkeye = {
+		Id = "Hawkeye", DisplayName = "Hawkeye Elixir", Description = "+50% headshot damage, half hip-fire spread",
+		Cost = 2000, Color = Color3.fromRGB(240, 240, 255), Letter = "H",
+	},
 }
 
 local PerkConfig = {
 	Perks = Perks,
-	MaxPerks = 4,
+	MaxPerks = 6,
+	HawkeyeHeadMult = 1.5,
+	HawkeyeSpreadMult = 0.5,
 	IronBodyHealth = 250,
 	QuickHandsReloadMult = 0.5,
 	RapidFireRpmMult = 1.33,

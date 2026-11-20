@@ -168,7 +168,7 @@ function SoundController.Start()
 		if typeof(origin) ~= "Vector3" then
 			return
 		end
-		local stats = typeof(weaponId) == "string" and WeaponConfig.Get(weaponId, upgraded == true)
+		local stats = typeof(weaponId) == "string" and WeaponConfig.Get(weaponId, upgraded)
 		SoundController.PlayAt(stats and stats.ShotSound or "RifleShot", origin, nil, stats and stats.ShotPitch or 1)
 	end)
 	Remotes.Get("Notify").OnClientEvent:Connect(function(kind, data)

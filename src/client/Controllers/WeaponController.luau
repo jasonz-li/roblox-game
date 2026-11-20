@@ -25,7 +25,7 @@ local fireRemote: RemoteEvent
 local reloadRemote: RemoteEvent
 local switchRemote: RemoteEvent
 
-local weaponId, upgraded = WeaponConfig.Default, false
+local weaponId, upgraded = WeaponConfig.Default, 0 -- upgraded = Forge level 0..3
 local stats = WeaponConfig.Get(weaponId)
 local mag, reserve = stats.MagSize, stats.ReserveAmmo
 local reloading, reloadStartedAt, reloadDuration = false, 0, 1
@@ -253,7 +253,8 @@ local function currentSpread(hum): number
 	if adsAlpha > 0.6 then
 		return stats.AdsSpread
 	end
-	return stats.HipSpread * (isMoving(hum) and 1.7 or 1)
+	local hawkeye = player:GetAttribute("Perk_Hawkeye") and PerkConfig.HawkeyeSpreadMult or 1
+	return stats.HipSpread * (isMoving(hum) and 1.7 or 1) * hawkeye
 end
 
 local function spreadDirection(look: Vector3, degrees: number): Vector3
@@ -266,13 +267,13 @@ local function spreadDirection(look: Vector3, degrees: number): Vector3
 end
 
 local function pushHud()
-	HudController.SetAmmo(mag, reserve, reloading, stats.DisplayName, stats.MagSize, upgraded)
+	HudController.SetAmmo(mag, reserve, reloading, stats.DisplayName, stats.MagSize, (tonumber(upgraded) or 0) > 0)
 end
 
 -- Adopt the server's view of the current weapon. Rebuilds the viewmodel if the weapon changed.
 local function syncFromServer()
 	local id = player:GetAttribute("WeaponId") or weaponId
-	local up = player:GetAttribute("WeaponUpgraded") == true
+	local up = player:GetAttribute("WeaponLevel") or (player:GetAttribute("WeaponUpgraded") == true and 1 or 0) -- Forge level 0..3
 	if id ~= weaponId or up ~= upgraded then
 		weaponId, upgraded = id, up
 		stats = WeaponConfig.Get(id, up) or stats
@@ -457,7 +458,7 @@ local function update(dt)
 	local sc = GameConfig.Stamina
 	local staminaMult = ProgressionConfig.StaminaMult(player) -- Second Wind upgrade
 	local maxStamina = sc.Max * staminaMult
-	local speedMult = PerkConfig.SpeedMultiplier(player)
+	local speedMult = PerkConfig.SpeedMultiplier(player) * ProgressionConfig.AdrenalineMult(player)
 	-- (reloading no longer cancels sprint: you can run and reload at the same time)
 	local wantsSprint = sprintHeld and isMoving(hum) and not adsHeld and not triggerHeld and not exhausted and stamina > 0
 	if wantsSprint then
@@ -589,6 +590,8 @@ function WeaponController.Start()
 			trySwitch(1)
 		elseif input.KeyCode == Enum.KeyCode.Two then
 			trySwitch(2)
+		elseif input.KeyCode == Enum.KeyCode.Three then
+			trySwitch(3) -- Pack Mule Tonic perk
 		elseif input.KeyCode == Enum.KeyCode.V then
 			melee()
 		end
@@ -628,6 +631,7 @@ function WeaponController.Start()
 	end)
 	player:GetAttributeChangedSignal("WeaponId"):Connect(syncFromServer)
 	player:GetAttributeChangedSignal("WeaponUpgraded"):Connect(syncFromServer)
+	player:GetAttributeChangedSignal("WeaponLevel"):Connect(syncFromServer)
 	player.CharacterAdded:Connect(function()
 		reloading = false
 		task.defer(syncFromServer)

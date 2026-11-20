@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 
 local GameConfig = require(game.ReplicatedStorage.Shared.Config.GameConfig)
+local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 local Signal = require(game.ReplicatedStorage.Shared.Util.Signal)
 local MapService = require(script.Parent.MapService)
 
@@ -13,6 +14,29 @@ local PlayerService = {}
 PlayerService.CharacterSpawned = Signal.new() -- (player, character)
 PlayerService.PlayerDied = Signal.new() -- (player)
 PlayerService.AllPlayersDead = Signal.new()
+
+-- Lethal guards: functions(player, humanoid) -> true if they saved the player from a
+-- killing blow (Second Chance pick, Phoenix perk). They run in order; first one wins.
+PlayerService.LethalGuards = {}
+
+-- All enemy damage to players goes through here (so guards can intercept death).
+function PlayerService.Damage(character: Model, amount: number)
+	local hum = character and character:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 then
+		return
+	end
+	if hum.Health - amount <= 0 then
+		local player = Players:GetPlayerFromCharacter(character)
+		if player then
+			for _, guard in PlayerService.LethalGuards do
+				if guard(player, hum) then
+					return
+				end
+			end
+		end
+	end
+	hum:TakeDamage(amount)
+end
 
 function PlayerService.IsAlive(player: Player): boolean
 	local char = player.Character
@@ -85,7 +109,7 @@ local function onCharacterAdded(player: Player, character: Model)
 	task.spawn(function()
 		while humanoid.Parent and humanoid.Health > 0 do
 			local dt = task.wait(0.1)
-			if humanoid.Health > 0 and humanoid.Health < humanoid.MaxHealth and os.clock() - lastHit >= cfg.RegenDelay then
+			if humanoid.Health > 0 and humanoid.Health < humanoid.MaxHealth and os.clock() - lastHit >= cfg.RegenDelay * ProgressionConfig.RegenDelayMult(player) then
 				humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + cfg.RegenPerSecond * dt)
 				lastHealth = humanoid.Health
 			end

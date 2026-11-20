@@ -443,7 +443,8 @@ return function(api)
 		api.part({ Name = "Stool", Shape = Enum.PartType.Cylinder, Size = V(2.6, 1.6, 1.6), CFrame = CFrame.new(x, 1.3, -65.5) * CFrame.Angles(0, 0, math.rad(90)), Color = C(200, 40, 50), Material = "SmoothPlastic", CanCollide = false })
 	end
 	-- booths along the east wall, clear of the kitchen doorway (x 22..28 at z -76)
-	for _, z in { -62, -52, -46 } do
+	-- and the Quick Hands machine (x 32.5..35.5, z -62..-58)
+	for _, z in { -53, -47 } do
 		api.box("Booth", V(30, 0, z), V(34, 3.2, z + 4), C(170, 40, 50), "Fabric")
 		api.box("BoothTable", V(26, 0, z + 0.5), V(29.5, 2.7, z + 3.5), C(220, 220, 225), "SmoothPlastic")
 	end
@@ -679,9 +680,9 @@ return function(api)
 		{ axis = "x", at = -112, from = -260, to = 300, out = -1 },
 		{ axis = "z", at = -260, from = -112, to = 90, out = -1 },
 		{ axis = "z", at = 300, from = -112, to = 90, out = 1 },
-		{ axis = "z", at = -100, from = 90, to = 225, out = -1 },
-		{ axis = "z", at = 100, from = 90, to = 225, out = 1 },
-		{ axis = "x", at = 225, from = -100, to = 100, out = 1 },
+		{ axis = "z", at = -75, from = 90, to = 225, out = -1 },
+		{ axis = "z", at = 75, from = 90, to = 225, out = 1 },
+		{ axis = "x", at = 225, from = -75, to = 75, out = 1 },
 	}
 	local seed = 0
 	for _, c in cliffs do

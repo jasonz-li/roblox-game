@@ -127,11 +127,15 @@ local function refreshOffer()
 		card.frame.Visible = def ~= nil
 		if def then
 			local have = ProgressionConfig.Count(player, id)
+			local rarityColor = ProgressionConfig.Rarity.Colors[def.Rarity] or def.Color
 			card.name.Text = def.Name
 			card.name.TextColor3 = def.Color
-			card.stroke.Color = def.Color
+			card.stroke.Color = rarityColor
+			card.stroke.Thickness = (def.Rarity == "Legendary" or def.Rarity == "Cursed") and 3.5 or 2
 			card.desc.Text = def.Desc
-			card.rank.Text = "Rank " .. (ROMAN[have + 1] or tostring(have + 1)) .. " / " .. (ROMAN[def.Max] or tostring(def.Max))
+			card.rank.Text = string.upper(def.Rarity or "Common")
+				.. (def.Max > 1 and ("  ·  Rank " .. (ROMAN[have + 1] or tostring(have + 1)) .. "/" .. (ROMAN[def.Max] or tostring(def.Max))) or "")
+			card.rank.TextColor3 = rarityColor
 		end
 	end
 	if ui.offer.Visible then

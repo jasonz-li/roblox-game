@@ -96,16 +96,18 @@ function handlers.Forge(player: Player, _part: BasePart)
 	if not w then
 		return
 	end
-	if w.upgraded then
-		return message(player, "Already forged")
+	local u = WeaponConfig.Upgrade
+	local level = w.level or (w.upgraded and 1 or 0)
+	if level >= u.MaxLevel then
+		return message(player, "Already fully reforged")
 	end
-	local cost = WeaponConfig.Upgrade.Cost
+	local cost = u.Costs[level + 1]
 	if not CurrencyService.TrySpend(player, cost) then
 		return notEnough(player, cost)
 	end
 	WeaponService.UpgradeCurrent(player)
 	sound(player, "PerkDrink")
-	message(player, "Forged: " .. WeaponConfig.Get(w.id, true).DisplayName, "good")
+	message(player, (level == 0 and "Forged: " or "Reforged: ") .. WeaponConfig.Get(w.id, level + 1).DisplayName, "good")
 end
 
 function handlers.Barrier(_player: Player, _part: BasePart)
@@ -135,7 +137,8 @@ local function promptTexts(part: BasePart)
 	elseif kind == "Perk" then
 		return "Drink " .. title, cost .. " pts"
 	elseif kind == "Forge" then
-		return "Forge held weapon", cost .. " pts"
+		local c = WeaponConfig.Upgrade.Costs
+		return "Forge held weapon", c[1] .. " / " .. c[2] .. " / " .. c[3] .. " pts (3 levels)"
 	elseif kind == "MysteryBox" then
 		return "Mystery Box", cost .. " pts"
 	end

@@ -17,12 +17,14 @@ local CameraController = require(script.Parent.CameraController)
 local ImpactController = {}
 ImpactController.HoldUntil = 0
 
+-- Kept short and rare on purpose: seen constantly, they get annoying.
 local TIERS = {
-	light = { flash = 0.55, lines = 10, invert = false, hold = 0.03, shake = 0.4, frames = 0.035 },
-	medium = { flash = 0.25, lines = 16, invert = false, hold = 0.06, shake = 0.8, frames = 0.05 },
-	heavy = { flash = 0.05, lines = 24, invert = true, hold = 0.09, shake = 1.4, frames = 0.055 },
+	light = { flash = 0.8, lines = 8, invert = false, hold = 0.02, shake = 0.3, frames = 0.025, grade = false },
+	medium = { flash = 0.4, lines = 14, invert = false, hold = 0.045, shake = 0.6, frames = 0.035 },
+	heavy = { flash = 0.15, lines = 22, invert = true, hold = 0.07, shake = 1.1, frames = 0.04 },
 }
-local MIN_GAP = { light = 0.12, medium = 0.18, heavy = 0.25 }
+-- Minimum seconds between impact frames (any tier blocks the next lighter one)
+local MIN_GAP = { light = 0.6, medium = 0.8, heavy = 1.2 }
 
 local gui: ScreenGui
 local flash: Frame
@@ -94,7 +96,7 @@ local function setFrame(kind: string, cfg)
 	if kind == "white" then
 		flash.BackgroundColor3 = Color3.new(1, 1, 1)
 		flash.BackgroundTransparency = cfg.flash
-		cc.Enabled = true
+		cc.Enabled = cfg.grade ~= false -- the light tier keeps the world's colors
 		cc.Saturation = -1
 		cc.Contrast = 1.6
 		cc.Brightness = 0.25
@@ -121,6 +123,10 @@ function ImpactController.Play(tier: string?)
 	local cfg = TIERS[tier]
 	local now = os.clock()
 	if now - lastPlay < MIN_GAP[tier] then
+		return
+	end
+	-- a light frame never fires right after a stronger one
+	if tier == "light" and now - lastPlay < MIN_GAP.heavy then
 		return
 	end
 	lastPlay = now

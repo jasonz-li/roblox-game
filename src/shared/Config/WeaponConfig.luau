@@ -111,11 +111,13 @@ local Weapons: { [string]: WeaponStats } = {
 local WeaponConfig: any = {
 	Weapons = Weapons,
 	Default = "Pistol",
-	MaxSlots = 2,
+	MaxSlots = 3, -- absolute max (2 normally, 3 with the Pack Mule Tonic perk)
 	SwitchTime = 0.35,
 	-- "Spirit Forge" upgrade multipliers
 	Upgrade = {
-		Cost = 5000,
+		Cost = 5000, -- first forge (kept for older callers)
+		Costs = { 5000, 7500, 10000 }, -- forge, reforge II, reforge III
+		MaxLevel = 3,
 		Damage = 2.0,
 		Mag = 1.5,
 		Reserve = 1.5,
@@ -175,23 +177,62 @@ WeaponConfig.Signature = Signature
 
 local cache: { [string]: WeaponStats } = {}
 
--- Effective stats for a weapon, including the Forge upgrade. Cached, treat as read-only.
-function WeaponConfig.Get(id: string, upgraded: boolean?): WeaponStats?
+-- Forge level from either the old boolean or a number (0 = not forged, max 3).
+function WeaponConfig.Level(upgraded: any): number
+	if upgraded == true then
+		return 1
+	end
+	return math.clamp(tonumber(upgraded) or 0, 0, WeaponConfig.Upgrade.MaxLevel)
+end
+
+local ROMAN = { "", " II", " III" }
+local LEVEL_TINT = { nil, Color3.fromRGB(255, 80, 200), Color3.fromRGB(230, 250, 255) } -- reforge glow
+
+-- Scale a signature effect for reforge levels 2 and 3 (bigger, stronger, more arcs).
+local function scaleEffects(effects, level: number)
+	if not effects or level <= 1 then
+		return effects
+	end
+	local k = level - 1
+	local out = {}
+	for name, e in effects do
+		local c = table.clone(e)
+		if name == "Explosive" then
+			c.Radius = e.Radius * (1.2 ^ k)
+			c.Damage = e.Damage * (1.6 ^ k)
+		elseif name == "Chain" then
+			c.Count = e.Count + 2 * k
+			c.Range = e.Range * (1.15 ^ k)
+			c.Mult = math.min(1, e.Mult + 0.15 * k)
+		elseif name == "Burn" then
+			c.Dps = e.Dps * (1.7 ^ k)
+		elseif name == "Shock" then
+			c.Slow = math.max(0.15, e.Slow - 0.12 * k)
+			c.Time = e.Time + 0.5 * k
+		end
+		out[name] = c
+	end
+	return out
+end
+
+-- Effective stats for a weapon at a Forge level (true/1..3). Cached, treat as read-only.
+function WeaponConfig.Get(id: string, upgraded: any): WeaponStats?
 	local base = Weapons[id]
 	if not base then
 		return nil
 	end
-	if not upgraded then
+	local level = WeaponConfig.Level(upgraded)
+	if level == 0 then
 		return base
 	end
-	local key = id .. "+"
+	local key = id .. "+" .. level
 	if cache[key] then
 		return cache[key]
 	end
 	local up = table.clone(base) :: any
 	local u = WeaponConfig.Upgrade
 	local sig = Signature[id] or {}
-	up.DisplayName = u.Prefix .. (sig.Name or base.DisplayName)
+	up.DisplayName = string.rep("✦", level) .. " " .. (sig.Name or base.DisplayName) .. ROMAN[level]
 	up.Damage = base.Damage * u.Damage
 	up.MagSize = math.floor(base.MagSize * u.Mag)
 	up.ReserveAmmo = math.floor(base.ReserveAmmo * u.Reserve)
@@ -200,12 +241,22 @@ function WeaponConfig.Get(id: string, upgraded: boolean?): WeaponStats?
 			up[k] = sig[k]
 		end
 	end
+	-- reforges: +60% damage and +25% ammo per level above 1
+	local extra = level - 1
+	up.Damage *= 1.6 ^ extra
+	up.MagSize = math.floor(up.MagSize * (1.25 ^ extra))
+	up.ReserveAmmo = math.floor(up.ReserveAmmo * (1.25 ^ extra))
+	local color = sig.Tracer or u.Accent
+	if LEVEL_TINT[level] then
+		color = color:Lerp(LEVEL_TINT[level], 0.6)
+	end
 	local view = table.clone(base.View) :: any
-	view.Accent = sig.Tracer or u.Accent
+	view.Accent = color
 	view.Dual = sig.Dual
 	up.View = view
-	up.TracerColor = sig.Tracer or u.Accent
-	up.Effects = sig.Effects
+	up.TracerColor = color
+	up.Effects = scaleEffects(sig.Effects, level)
+	up.Level = level
 	cache[key] = up
 	return up
 end

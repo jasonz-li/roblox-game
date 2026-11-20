@@ -53,11 +53,19 @@ return {
 		{ axis = "x", at = -112, from = -260, to = 300, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
 		{ axis = "z", at = -260, from = -112, to = 90, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
 		{ axis = "z", at = 300, from = -112, to = 90, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
-		{ axis = "z", at = -100, from = 90, to = 225, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
-		{ axis = "z", at = 100, from = 90, to = 225, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
-		{ axis = "x", at = 225, from = -100, to = 100, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
+		-- Elm Lane cliffs (pulled in from ±100: the strips behind the houses were never used)
+		{ axis = "z", at = -75, from = 90, to = 225, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
+		{ axis = "z", at = 75, from = 90, to = 225, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
+		{ axis = "x", at = 225, from = -75, to = 75, height = 56, color = ROCK, material = "Rock", name = "Cliff" },
 		-- Town's south edge; Elm Lane barricade gap = D1
 		{ axis = "x", at = 90, from = -260, to = 300, gaps = { { -14, 14 } } },
+		-- Shrink (hotspot data): the burned field and the junkyard south of Main Street
+		-- were almost never visited. They're sealed off as "outside"; only a 60-wide
+		-- lane runs from Main Street down to the Elm Lane barricade (D1).
+		{ axis = "x", at = 12, from = -150, to = -30, name = "FieldWall" },
+		{ axis = "x", at = 12, from = 30, to = 170, name = "JunkyardWall" },
+		{ axis = "z", at = -30, from = 12, to = 90, name = "LaneWallW" },
+		{ axis = "z", at = 30, from = 12, to = 90, name = "LaneWallE" },
 		-- Gas Station | Main Street (D2 road). The duplicate back gates (D2b, D3b, D4b)
 		-- were removed: one door per area.
 		{ axis = "z", at = -150, from = -112, to = 90, gaps = { { -32, 4 } } },
@@ -92,13 +100,17 @@ return {
 		{ Perk = "RapidFire", Pos = V(-188, 0, 53), Face = V(0, 0, -1) },
 		{ Perk = "QuickHands", Pos = V(34, 0, -60), Face = V(-1, 0, 0) },
 		{ Perk = "IronBody", Pos = V(191, 0, 88), Face = V(0, 0, -1) },
+		{ Perk = "StormCoil", Pos = V(177.5, -20, -52), Face = V(-1, 0, 0) }, -- pump chamber, east wall
+		{ Perk = "Phoenix", Pos = V(-27, 0, 205), Face = V(1, 0, 0) }, -- Elm Lane loop road (start area)
+		{ Perk = "PackMule", Pos = V(76, 0, -38.5), Face = V(0, 0, 1) }, -- Main Street, theater front
+		{ Perk = "Hawkeye", Pos = V(-257.5, 0, -85), Face = V(1, 0, 0) }, -- gas station, west wall (clear of the z=-60 window)
 	},
 
 	Forge = { Pos = V(15, -20, -97.5), Face = V(0, 0, 1) },
 
 	BoxLocations = {
 		{ Zone = 0, Pos = V(63.2, 0, 185), Face = V(-1, 0, 0) }, -- Elm Lane garage
-		{ Zone = 1, Pos = V(130, 0, 87.7), Face = V(0, 0, -1) }, -- Junkyard
+		{ Zone = 1, Pos = V(-112, 0, 9.7), Face = V(0, 0, -1) }, -- Main Street, south sidewalk (junkyard is gone)
 		{ Zone = 3, Pos = V(-22.2, 0, -62), Face = V(1, 0, 0) }, -- Diner
 		{ Zone = 4, Pos = V(220, 0, -108.2), Face = V(0, 0, 1) }, -- Motel room
 		{ Zone = 2, Pos = V(-212, 0, 87.7), Face = V(0, 0, -1) }, -- Behind the gas station
@@ -109,24 +121,31 @@ return {
 
 	-- Ground spawns: zombies claw up out of the dirt here (fewer now that windows exist).
 	EnemySpawns = {
-		{ Zone = 0, Pos = V(0, 0, 218) }, { Zone = 0, Pos = V(-92, 0, 98) },
-		{ Zone = 1, Pos = V(-145, 0, -36) }, { Zone = 1, Pos = V(165, 0, -36) }, { Zone = 1, Pos = V(-40, 0, -38) }, { Zone = 1, Pos = V(80, 0, 20) },
+		{ Zone = 0, Pos = V(0, 0, 218) }, { Zone = 0, Pos = V(-60, 0, 100) },
+		{ Zone = 1, Pos = V(-145, 0, -36) }, { Zone = 1, Pos = V(165, 0, -36) }, { Zone = 1, Pos = V(-40, 0, -38) }, { Zone = 1, Pos = V(100, 0, 6) },
 		{ Zone = 2, Pos = V(-160, 0, -105) }, { Zone = 2, Pos = V(-160, 0, 85) },
 		{ Zone = 3, Pos = V(-90, 0, -105) },
 		{ Zone = 4, Pos = V(265, 0, 0) }, { Zone = 4, Pos = V(180, 0, -70) }, { Zone = 4, Pos = V(180, 0, 50) }, { Zone = 4, Pos = V(275, 0, 40) },
 		{ Zone = 5, Pos = V(150, -20, -70) }, { Zone = 5, Pos = V(45, -20, -60) }, { Zone = 5, Pos = V(0, -20, -60) }, { Zone = 5, Pos = V(-10, -20, -80) },
+		-- more underground spawns: zombies come at you from several sides, not one hallway
+		{ Zone = 5, Pos = V(38, -20, -92) }, { Zone = 5, Pos = V(85, -20, -70) }, { Zone = 5, Pos = V(128, -20, -50) },
+		{ Zone = 5, Pos = V(172, -20, -90) }, { Zone = 5, Pos = V(212, -20, -70) },
 	},
 
 	-- Boarded windows cut into boundary walls. Zombies appear on the outside, tear the
 	-- boards off, then climb in. Axis/At must match a wall line in `Walls` (the gap is cut
 	-- automatically). Along = position along that wall; Inward = direction into play space.
 	Barriers = {
-		{ Zone = 0, Axis = "z", At = -100, Along = 150, Inward = V(1, 0, 0), WallHeight = 56 },
-		{ Zone = 0, Axis = "z", At = 100, Along = 130, Inward = V(-1, 0, 0), WallHeight = 56 },
+		-- (moved clear of the houses after the Elm Lane cliffs came in to ±75)
+		{ Zone = 0, Axis = "z", At = -75, Along = 186, Inward = V(1, 0, 0), WallHeight = 56 },
+		{ Zone = 0, Axis = "z", At = 75, Along = 165, Inward = V(-1, 0, 0), WallHeight = 56 },
 		{ Zone = 0, Axis = "x", At = 225, Along = -40, Inward = V(0, 0, -1), WallHeight = 56 },
 		{ Zone = 0, Axis = "x", At = 225, Along = 50, Inward = V(0, 0, -1), WallHeight = 56 },
-		{ Zone = 1, Axis = "x", At = 90, Along = -125, Inward = V(0, 0, -1), WallHeight = 28 },
-		{ Zone = 1, Axis = "x", At = 90, Along = 145, Inward = V(0, 0, -1), WallHeight = 28 },
+		-- Main Street: zombies pour in from the sealed-off field and junkyard
+		{ Zone = 1, Axis = "z", At = -30, Along = 52, Inward = V(1, 0, 0), WallHeight = 28 },
+		{ Zone = 1, Axis = "z", At = 30, Along = 58, Inward = V(-1, 0, 0), WallHeight = 28 },
+		{ Zone = 1, Axis = "x", At = 12, Along = -122, Inward = V(0, 0, -1), WallHeight = 28 },
+		{ Zone = 1, Axis = "x", At = 12, Along = 110, Inward = V(0, 0, -1), WallHeight = 28 },
 		{ Zone = 2, Axis = "z", At = -260, Along = -60, Inward = V(1, 0, 0), WallHeight = 56 },
 		{ Zone = 2, Axis = "z", At = -260, Along = 40, Inward = V(1, 0, 0), WallHeight = 56 },
 		{ Zone = 2, Axis = "x", At = -112, Along = -200, Inward = V(0, 0, 1), WallHeight = 56 },

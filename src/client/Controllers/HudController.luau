@@ -259,9 +259,13 @@ local function refreshSlots()
 	local cur = player:GetAttribute("CurrentSlot") or 1
 	for i, l in ui.slots do
 		local id = player:GetAttribute("Slot" .. i) or ""
-		local up = player:GetAttribute("Slot" .. i .. "Up") == true
-		local stats = id ~= "" and WeaponConfig.Get(id, up)
+		local lvl = player:GetAttribute("Slot" .. i .. "Lvl") or (player:GetAttribute("Slot" .. i .. "Up") == true and 1 or 0)
+		local up = lvl > 0
+		local stats = id ~= "" and WeaponConfig.Get(id, lvl)
 		l.Text = string.format("[%d]  %s", i, stats and string.upper(stats.DisplayName) or "—")
+		if i > 2 and id == "" and not player:GetAttribute("Perk_PackMule") then
+			l.Text = "" -- third slot only shows with the Pack Mule Tonic perk
+		end
 		l.TextColor3 = (i == cur) and (up and GOLD or WHITE) or Color3.fromRGB(140, 140, 160)
 		l.TextTransparency = (i == cur) and 0 or 0.25
 	end
@@ -630,6 +634,7 @@ function HudController.Start()
 	for i = 1, WeaponConfig.MaxSlots do
 		player:GetAttributeChangedSignal("Slot" .. i):Connect(refreshSlots)
 		player:GetAttributeChangedSignal("Slot" .. i .. "Up"):Connect(refreshSlots)
+		player:GetAttributeChangedSignal("Slot" .. i .. "Lvl"):Connect(refreshSlots)
 	end
 	player:GetAttributeChangedSignal("CurrentSlot"):Connect(refreshSlots)
 	player:GetAttributeChangedSignal("PerkOrder"):Connect(refreshPerks)

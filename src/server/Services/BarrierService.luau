@@ -99,9 +99,10 @@ function BarrierService.Repair(player: Player, barrier: BasePart)
 	end
 	local earned = repairEarned[player] or 0
 	if earned < cfg.RepairPointsCapPerWave then
-		local amount = math.min(cfg.RepairPoints, cfg.RepairPointsCapPerWave - earned)
+		local amount = cfg.RepairPoints + (n >= max and (cfg.SealBonus or 0) or 0) -- last board: sealed bonus
+		amount = math.min(amount, cfg.RepairPointsCapPerWave - earned)
 		repairEarned[player] = earned + amount
-		CurrencyService.Add(player, amount, "Repair")
+		CurrencyService.Add(player, amount, n >= max and "Window sealed" or "Repair")
 		Remotes.Get("Notify"):FireClient(player, "Sound", { name = "RepairCash" }) -- cha-ching
 	end
 end

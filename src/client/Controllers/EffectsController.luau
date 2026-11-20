@@ -216,7 +216,7 @@ function EffectsController.Start()
 	startZombieWalk()
 	Remotes.Get("ShotFx").OnClientEvent:Connect(function(_shooter, origin, endPos, weaponId, upgraded)
 		if typeof(origin) == "Vector3" and typeof(endPos) == "Vector3" then
-			local stats = typeof(weaponId) == "string" and WeaponConfig.Get(weaponId, upgraded == true)
+			local stats = typeof(weaponId) == "string" and WeaponConfig.Get(weaponId, upgraded)
 			EffectsController.Tracer(origin, endPos, stats and stats.TracerColor or Color3.fromRGB(150, 200, 255))
 		end
 	end)

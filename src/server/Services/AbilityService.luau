@@ -10,6 +10,7 @@
 local Players = game:GetService("Players")
 
 local HeroConfig = require(game.ReplicatedStorage.Shared.Config.HeroConfig)
+local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 local GameConfig = require(game.ReplicatedStorage.Shared.Config.GameConfig)
 local Remotes = require(game.ReplicatedStorage.Shared.Net.Remotes)
 local RemoteGuard = require(script.Parent.Parent.Util.RemoteGuard)
@@ -188,8 +189,9 @@ local function onUse(player: Player, slot, aim)
 			return
 		end
 		if cast[hero.Id](player, hero, root, aim) then
-			readyAt[player] = now + hero.Ability.Cooldown
-			player:SetAttribute("AbilityReadyAt", workspace:GetServerTimeNow() + hero.Ability.Cooldown)
+			local cd = hero.Ability.Cooldown * ProgressionConfig.CooldownMult(player) -- Overclock
+			readyAt[player] = now + cd
+			player:SetAttribute("AbilityReadyAt", workspace:GetServerTimeNow() + cd)
 		end
 	else
 		if (player:GetAttribute("UltCharge") or 0) < HeroConfig.Ult.Max or player:GetAttribute("UltActive") then
@@ -233,6 +235,16 @@ function AbilityService.Reset()
 	end
 end
 
+-- Take `seconds` off the current ability cooldown (Vampiric Edge)
+function AbilityService.Refund(player: Player, seconds: number)
+	if not readyAt[player] then
+		return
+	end
+	readyAt[player] -= seconds
+	local at = (player:GetAttribute("AbilityReadyAt") or 0) - seconds
+	player:SetAttribute("AbilityReadyAt", math.max(0, at))
+end
+
 function AbilityService.KnifeMult(player: Player): number
 	return HeroConfig.Get(player:GetAttribute("Hero")).KnifeMult or 1
 end
@@ -254,6 +266,7 @@ function AbilityService.Start()
 		local c = HeroConfig.Ult
 		local gain = data.isElite and c.EliteKillCharge or (headshot and c.HeadshotKillCharge or c.KillCharge)
 		gain *= HeroConfig.Get(killer:GetAttribute("Hero")).UltChargeMult or 1
+		gain *= ProgressionConfig.UltChargeMult(killer) -- Overclock
 		setUlt(killer, (killer:GetAttribute("UltCharge") or 0) + gain)
 	end)
 

@@ -78,8 +78,9 @@ local GameConfig = {
 		Boards = 6,
 		TearInterval = 1.25, -- seconds per board a zombie needs
 		RepairInterval = 0.6, -- hold E: one board back every this many seconds
-		RepairPoints = 10, -- per board rebuilt
-		RepairPointsCapPerWave = 500, -- per player (50 boards); only stops endless farming
+		RepairPoints = 25, -- per board rebuilt (was 10: not worth doing)
+		SealBonus = 100, -- extra for putting the LAST board back (window fully sealed)
+		RepairPointsCapPerWave = 1500, -- per player; only stops endless farming
 		VaultTime = 0.6,
 		BarrierSpawnChance = 0.75, -- otherwise zombies climb out of the ground
 	},

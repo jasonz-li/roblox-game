@@ -450,6 +450,8 @@ function AbilityController.Start()
 	Remotes.Get("Notify").OnClientEvent:Connect(function(kind, data)
 		if kind == "AbilityFx" and FX[data.kind] then
 			FX[data.kind](data)
+		elseif kind == "Impact" then
+			ImpactController.Play(data.tier)
 		elseif kind == "Knockback" and typeof(data.vel) == "Vector3" then
 			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 			if root then

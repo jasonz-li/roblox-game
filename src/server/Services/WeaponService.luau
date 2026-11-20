@@ -21,6 +21,7 @@ local MapService = require(script.Parent.MapService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 local HeroConfig = require(game.ReplicatedStorage.Shared.Config.HeroConfig)
+local AbilityService = require(script.Parent.AbilityService)
 
 local WeaponService = {}
 
@@ -37,11 +38,14 @@ local gameState: Folder
 -- Inventory helpers
 ----------------------------------------------------------------------
 
-local function newWeapon(id: string, upgraded: boolean?)
-	local stats = WeaponConfig.Get(id, upgraded)
+-- `upgraded`: Forge level 0..3 (true = 1, for older callers)
+local function newWeapon(id: string, upgraded: any)
+	local level = WeaponConfig.Level(upgraded)
+	local stats = WeaponConfig.Get(id, level)
 	return {
 		id = id,
-		upgraded = upgraded == true,
+		level = level,
+		upgraded = level > 0,
 		stats = stats,
 		mag = stats.MagSize,
 		reserve = stats.ReserveAmmo,
@@ -65,6 +69,7 @@ local function sync(player)
 	local w = inv.slots[inv.current]
 	player:SetAttribute("WeaponId", w.id)
 	player:SetAttribute("WeaponUpgraded", w.upgraded)
+	player:SetAttribute("WeaponLevel", w.level)
 	player:SetAttribute("Ammo", w.mag)
 	player:SetAttribute("Reserve", w.reserve)
 	player:SetAttribute("Reloading", w.reloading)
@@ -73,6 +78,7 @@ local function sync(player)
 		local s = inv.slots[i]
 		player:SetAttribute("Slot" .. i, s and s.id or "")
 		player:SetAttribute("Slot" .. i .. "Up", s and s.upgraded or false)
+		player:SetAttribute("Slot" .. i .. "Lvl", s and s.level or 0)
 	end
 end
 
@@ -208,6 +214,12 @@ local function creditKill(player: Player, isHead: boolean, label: string)
 end
 
 local notifyRemote: RemoteEvent
+local stormReady = {} -- [Player] = os.clock() when Storm Coil can fire again
+
+-- Weapon slots: 2, or 3 with the Pack Mule Tonic perk
+local function slotsFor(player: Player): number
+	return player:GetAttribute(PerkConfig.AttributeName("PackMule")) and 3 or 2
+end
 
 local function explode(player: Player, pos: Vector3, cfg, dmgMult: number, report)
 	local n = 0
@@ -317,9 +329,12 @@ local function onFire(player: Player, origin, directions, claims)
 	local firstEnd
 	local dmgMult = ProgressionConfig.DamageMult(player)
 	local headMult = stats.HeadshotMultiplier * ProgressionConfig.HeadshotMult(player)
+		* (player:GetAttribute(PerkConfig.AttributeName("Hawkeye")) and PerkConfig.HawkeyeHeadMult or 1)
 
 	local fx = stats.Effects
 	local chained = {}
+	local executioner = ProgressionConfig.Count(player, "Executioner") > 0
+	local ricochet = ProgressionConfig.Count(player, "Ricochet")
 	for i, dir in dirs do
 		local claimed = claims[i]
 		if claimed == false then
@@ -331,8 +346,15 @@ local function onFire(player: Player, origin, directions, claims)
 		for hi, h in hits do
 			local isHead = h.part.Name == "Head"
 			local damage = stats.Damage * dmgMult * (isHead and headMult or 1) * ((stats.PierceFalloff or PIERCE_FALLOFF) ^ h.index)
-			if instaKill then
+			if instaKill and not h.enemy.isBoss then -- the Titan is immune to Insta-Kill
 				damage = h.enemy.humanoid.Health
+			end
+			-- Executioner: a hit that leaves a zombie under 25% finishes it (not the Titan)
+			if executioner and not h.enemy.isBoss then
+				local hum = h.enemy.humanoid
+				if hum.Health - damage < hum.MaxHealth * 0.25 then
+					damage = math.max(damage, hum.Health)
+				end
 			end
 			local model = h.enemy.model
 			local killed = EnemyService.Damage(h.enemy, damage, player, isHead, dir)
@@ -367,6 +389,11 @@ local function onFire(player: Player, origin, directions, claims)
 				chained[h.enemy] = true
 				chain(player, h.enemy, damage, fx.Chain, chained, report)
 			end
+			-- Ricochet pick: headshots bounce to more zombies
+			if ricochet > 0 and isHead then
+				chained[h.enemy] = true
+				chain(player, h.enemy, damage, { Count = ricochet, Range = 16, Mult = 0.7 }, chained, report)
+			end
 		end
 		-- Explosive rounds burst where the bullet ends (wall, floor or zombie)
 		if fx and fx.Explosive then
@@ -381,7 +408,7 @@ local function onFire(player: Player, origin, directions, claims)
 
 	for _, other in Players:GetPlayers() do
 		if other ~= player then
-			shotFx:FireClient(other, player, origin, firstEnd, w.id, w.upgraded)
+			shotFx:FireClient(other, player, origin, firstEnd, w.id, w.level)
 		end
 	end
 	if next(hitEnemies) or #report > 0 then -- (#report: a blast or arc hit something)
@@ -439,7 +466,7 @@ local function onMelee(player: Player, lookDir, claimedPart)
 	end
 	local instaKill = workspace:GetServerTimeNow() < (gameState:GetAttribute("InstaKillUntil") or 0)
 	local heroKnife = HeroConfig.Get(player:GetAttribute("Hero")).KnifeMult or 1 -- Ren's passive
-	local damage = instaKill and best.humanoid.Health or cfg.Damage * ProgressionConfig.KnifeMult(player) * heroKnife
+	local damage = (instaKill and not best.isBoss) and best.humanoid.Health or cfg.Damage * ProgressionConfig.KnifeMult(player) * heroKnife
 	local model, pos = best.model, best.root.Position + Vector3.new(0, 1, 0)
 	local killed = EnemyService.Damage(best, damage, player, false, lookDir)
 	CurrencyService.Add(player, GameConfig.Points.Hit, nil, true)
@@ -447,6 +474,15 @@ local function onMelee(player: Player, lookDir, claimedPart)
 		CurrencyService.AddKill(player)
 		local mult = ProgressionService.OnKill(player, false)
 		CurrencyService.Add(player, math.floor(cfg.KillPoints * mult), "Knife", true)
+		-- Vampiric Edge pick: knife kills heal and cut the ability cooldown
+		local vamp = ProgressionConfig.Count(player, "VampiricEdge")
+		if vamp > 0 then
+			local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health > 0 then
+				hum.Health = math.min(hum.MaxHealth, hum.Health + 25 * vamp)
+			end
+			AbilityService.Refund(player, 2 * vamp)
+		end
 	end
 	hitConfirm:FireClient(player, false, killed, damage, { { model, pos, math.floor(damage), false, killed } }, true)
 end
@@ -471,6 +507,22 @@ local function onReload(player: Player)
 	w.reloadToken += 1
 	local token, generation = w.reloadToken, inv.generation
 	player:SetAttribute("Reloading", true)
+
+	-- Storm Coil perk: a lightning nova; the emptier the magazine, the bigger it is
+	if player:GetAttribute(PerkConfig.AttributeName("StormCoil")) and os.clock() >= (stormReady[player] or 0) then
+		stormReady[player] = os.clock() + 1.5
+		local empty = 1 - w.mag / math.max(1, w.stats.MagSize)
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if root and empty > 0.05 then
+			local wave = gameState:GetAttribute("Wave") or 1
+			EnemyService.Explode(root.Position, 6 + 9 * empty, (60 + 35 * wave) * (0.4 + empty), player, function()
+				creditKill(player, false, "Storm Coil")
+			end, Color3.fromRGB(110, 180, 255))
+			for _, data in EnemyService.InRadius(root.Position, 6 + 9 * empty) do
+				EnemyService.Slow(data, 0.4, 1.2)
+			end
+		end
+	end
 
 	task.delay(w.stats.ReloadTime * PerkConfig.ReloadMultiplier(player), function()
 		local inv2 = inventories[player]
@@ -530,7 +582,7 @@ function WeaponService.GiveWeapon(player: Player, id: string, upgraded: boolean?
 		return false
 	end
 	cancelReload(inv.slots[inv.current])
-	local slot = #inv.slots < WeaponConfig.MaxSlots and #inv.slots + 1 or inv.current
+	local slot = #inv.slots < slotsFor(player) and #inv.slots + 1 or inv.current
 	inv.slots[slot] = newWeapon(id, upgraded)
 	inv.current = slot
 	inv.switchUntil = os.clock() + WeaponConfig.SwitchTime * 0.8
@@ -565,12 +617,27 @@ function WeaponService.UpgradeCurrent(player: Player): (boolean, string?)
 	if not w then
 		return false, "No weapon"
 	end
-	if w.upgraded then
-		return false, "Already forged"
+	if w.level >= WeaponConfig.Upgrade.MaxLevel then
+		return false, "Fully reforged"
 	end
-	inv.slots[inv.current] = newWeapon(w.id, true)
+	inv.slots[inv.current] = newWeapon(w.id, w.level + 1)
 	sync(player)
 	return true
+end
+
+-- Scavenger pick: load rounds straight into the magazine of the weapon in hand
+function WeaponService.AddMag(player: Player, n: number)
+	local w = current(player)
+	if w then
+		w.mag = math.min(w.stats.MagSize, w.mag + n)
+		sync(player)
+	end
+end
+
+-- Level of the weapon in hand (0 = not forged)
+function WeaponService.GetLevel(player: Player): number
+	local w = current(player)
+	return w and w.level or 0
 end
 
 -- Max Ammo power-up: full reserve for every weapon of every player.

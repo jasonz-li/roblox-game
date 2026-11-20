@@ -863,20 +863,29 @@ local function nearestHeightGap(roots, pos)
 	return best
 end
 
--- Pick from candidates: prefer ones 22..maxNear studs from the nearest living player.
+-- Pick from candidates: prefer ones 22..maxNear (walking distance) from the nearest
+-- living player; if none, the 3 CLOSEST (never a random far one).
 local function pickNear(list, getPos, roots, maxNear)
-	local preferred, fallback = {}, {}
+	local preferred, scored = {}, {}
 	for _, c in list do
 		local d = nearestDist(roots, getPos(c))
 		if d >= 22 then
-			table.insert(fallback, c)
+			table.insert(scored, { c, d })
 			if d <= maxNear then
 				table.insert(preferred, c)
 			end
 		end
 	end
-	local pool = #preferred > 0 and preferred or (#fallback > 0 and fallback or list)
-	return #pool > 0 and pool[math.random(1, #pool)] or nil
+	if #preferred > 0 then
+		return preferred[math.random(1, #preferred)]
+	end
+	if #scored == 0 then
+		return #list > 0 and list[math.random(1, #list)] or nil
+	end
+	table.sort(scored, function(a, b)
+		return a[2] < b[2]
+	end)
+	return scored[math.random(1, math.min(3, #scored))][1]
 end
 
 -- Where the next zombie comes from: a boarded window (most of the time) or a ground spawn.
@@ -897,16 +906,24 @@ function MapService.GetEnemySpawn(groundOnly: boolean?)
 			end
 		end
 	end
-	local useBarrier = not groundOnly and #barriers > 0 and (#grounds == 0 or math.random() < GameConfig.Barrier.BarrierSpawnChance)
-	if useBarrier then
-		local b = pickNear(barriers, function(x)
-			return x:GetAttribute("Inside")
-		end, roots, 110)
-		if b then
-			local out = b:GetAttribute("Outside")
-			local side = (b:GetAttribute("Inside") - out).Unit:Cross(Vector3.yAxis)
-			return { pos = out - Vector3.new(0, 3, 0) + side * math.random(-15, 15) / 10, barrier = b, emerge = false }
+	-- Windows are only used when one is actually near a player. (Before, with no window
+	-- in range, it picked a random window anywhere: underground, 75% of zombies spawned
+	-- at far-off windows and the lab felt empty.) Otherwise: ground spawns near you.
+	local nearBarriers = {}
+	if not groundOnly then
+		for _, b in barriers do
+			local d = nearestDist(roots, b:GetAttribute("Inside"))
+			if d >= 22 and d <= 110 then
+				table.insert(nearBarriers, b)
+			end
 		end
+	end
+	local useBarrier = #nearBarriers > 0 and (#grounds == 0 or math.random() < GameConfig.Barrier.BarrierSpawnChance)
+	if useBarrier then
+		local b = nearBarriers[math.random(1, #nearBarriers)]
+		local out = b:GetAttribute("Outside")
+		local side = (b:GetAttribute("Inside") - out).Unit:Cross(Vector3.yAxis)
+		return { pos = out - Vector3.new(0, 3, 0) + side * math.random(-15, 15) / 10, barrier = b, emerge = false }
 	end
 	local s = pickNear(grounds, function(x)
 		return x.Position
