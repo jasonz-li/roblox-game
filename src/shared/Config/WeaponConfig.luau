@@ -33,6 +33,7 @@ export type WeaponStats = {
 	AdsFov: number,
 	Pellets: number,
 	Pierce: number, -- extra enemies a bullet passes through
+	PierceFalloff: number?, -- damage multiplier per enemy passed through (default 0.8)
 	ShotSound: string, -- SoundConfig key
 	ShotPitch: number,
 	TracerColor: Color3?,
@@ -80,11 +81,13 @@ local Weapons: { [string]: WeaponStats } = {
 	Sniper = {
 		Id = "Sniper", DisplayName = "Tsukuyomi Longbow", Class = "Sniper", FireMode = "Semi",
 		Damage = 240, HeadshotMultiplier = 3.0, RPM = 55, MagSize = 5, ReserveAmmo = 30, ReloadTime = 3.0,
-		Range = 900, HipSpread = 5.0, AdsSpread = 0, RecoilKick = 4, RecoilSide = 0.5, AdsFov = 28,
-		Pellets = 1, Pierce = 2, ShotSound = "HeavyShot", ShotPitch = 0.85,
+		Range = 900, HipSpread = 5.0, AdsSpread = 0, RecoilKick = 4, RecoilSide = 0.5, AdsFov = 42,
+		-- collateral: a round punches through up to 5 zombies at full damage
+		Pellets = 1, Pierce = 5, PierceFalloff = 1, ShotSound = "HeavyShot", ShotPitch = 0.85,
 		TracerColor = Color3.fromRGB(180, 140, 255),
 		WallCost = 2000, AmmoCost = 1000, BoxWeight = 12,
-		View = { Length = 2.3, Barrel = 1.4, Color = Color3.fromRGB(40, 44, 40), Accent = Color3.fromRGB(180, 140, 255), Stock = true, MagHeight = 0.4, Scope = true, AdsHeight = 0.5 },
+		-- iron sights (no scope overlay)
+		View = { Length = 2.3, Barrel = 1.4, Color = Color3.fromRGB(40, 44, 40), Accent = Color3.fromRGB(180, 140, 255), Stock = true, MagHeight = 0.4 },
 	},
 	LMG = {
 		Id = "LMG", DisplayName = "Kaiju LMG", Class = "LMG", FireMode = "Auto",

@@ -330,7 +330,7 @@ local function onFire(player: Player, origin, directions, claims)
 		local headPos
 		for hi, h in hits do
 			local isHead = h.part.Name == "Head"
-			local damage = stats.Damage * dmgMult * (isHead and headMult or 1) * (PIERCE_FALLOFF ^ h.index)
+			local damage = stats.Damage * dmgMult * (isHead and headMult or 1) * ((stats.PierceFalloff or PIERCE_FALLOFF) ^ h.index)
 			if instaKill then
 				damage = h.enemy.humanoid.Health
 			end

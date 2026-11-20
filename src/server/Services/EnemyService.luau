@@ -416,46 +416,133 @@ end
 -- Damage & death
 ----------------------------------------------------------------------
 
--- Death: the block body comes apart and is knocked away from the shot, then fades.
--- Parts move to the "Corpses" collision group so they never block players or enemies.
+-- Death: a ragdoll. The body stays in one piece (limb motors become ball sockets),
+-- is thrown back along the hit and crumples; headshots pop the head off. After a
+-- beat it dissolves into embers and ash. Corpses only collide with the world, and
+-- they're gone in ~2s so nothing piles up underfoot.
+local DISSOLVE_AT = 1.2
+local DISSOLVE_TIME = 0.55
+
+local function socket(part0: BasePart, part1: BasePart, at0: CFrame, at1: CFrame, upper: number)
+	local a0 = Instance.new("Attachment")
+	a0.CFrame = at0
+	a0.Parent = part0
+	local a1 = Instance.new("Attachment")
+	a1.CFrame = at1
+	a1.Parent = part1
+	local s = Instance.new("BallSocketConstraint")
+	s.Attachment0, s.Attachment1 = a0, a1
+	s.LimitsEnabled = true
+	s.UpperAngle = upper
+	s.TwistLimitsEnabled = true
+	s.TwistLowerAngle, s.TwistUpperAngle = -30, 30
+	s.Parent = part0
+end
+
 local function despawn(data, hitDir: Vector3?, isHeadshot: boolean?)
 	local model = data.model
-	local push = (hitDir and hitDir.Magnitude > 0) and Vector3.new(hitDir.X, 0, hitDir.Z).Unit or Vector3.zero
+	local root = data.root
+	local scale = data.scale or 1
+	local flat = (hitDir and Vector3.new(hitDir.X, 0, hitDir.Z).Magnitude > 0.05) and Vector3.new(hitDir.X, 0, hitDir.Z).Unit or -root.CFrame.LookVector
+	local lift = hitDir and math.max(0, hitDir.Y) or 0 -- explosions add an upward kick
 	if data.humanoid.Parent then
 		data.humanoid:Destroy()
-	end
-	for _, d in model:GetDescendants() do
-		if d:IsA("WeldConstraint") or d:IsA("Motor6D") then
-			d:Destroy()
-		end
 	end
 	local collider = model:FindFirstChild("Collider")
 	if collider then
 		collider:Destroy()
 	end
+
+	-- limbs: Motor6D -> ball socket at the same shoulder/hip pivot
+	for _, m in root:GetChildren() do
+		if m:IsA("Motor6D") and m.Part1 then
+			socket(root, m.Part1, m.C0, m.C1, 75)
+			m:Destroy()
+		end
+	end
+	-- head: welded to the root; becomes a neck socket, or pops off on a headshot
+	local head = model:FindFirstChild("Head")
+	if head then
+		for _, w in head:GetChildren() do
+			if w:IsA("WeldConstraint") then
+				w:Destroy()
+			end
+		end
+		if not isHeadshot then
+			local neck = root.CFrame:ToObjectSpace(head.CFrame) * CFrame.new(0, -head.Size.Y / 2, 0)
+			socket(root, head, neck, CFrame.new(0, -head.Size.Y / 2, 0), 45)
+		end
+	end
+
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.CanQuery = false
 			d.CanTouch = false
-			if d == data.root then
-				d.Anchored = true
-				continue
-			end
 			d.CollisionGroup = "Corpses"
-			d.CanCollide = true
-			d.Massless = false
-			local isHead = d.Name == "Head" or d.Name == "Eye"
-			local speed = (isHead and isHeadshot) and 55 or 22
-			local spread = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5) * 14
-			d.AssemblyLinearVelocity = push * speed + spread + Vector3.new(0, (isHead and isHeadshot) and 30 or 14, 0)
-			d.AssemblyAngularVelocity = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 20
-			pcall(function()
-				d:SetNetworkOwner(nil)
-			end)
-			TweenService:Create(d, TweenInfo.new(0.6, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, false, 1.4), { Transparency = 1 }):Play()
+			d.CanCollide = d.Name ~= "Eye" and d.Name ~= "EmberCrack"
+			if d.Name ~= "Eye" and d.Name ~= "EmberCrack" then
+				d.Massless = false
+			end
 		end
 	end
-	task.delay(2.1, function()
+	root.Anchored = false
+	pcall(function()
+		root:SetNetworkOwner(nil)
+	end)
+
+	-- thrown back along the hit, toppling over backwards
+	local power = (isHeadshot and 30 or 22) + lift * 40
+	root.AssemblyLinearVelocity = flat * power + Vector3.new(0, 12 + lift * 35, 0)
+	root.AssemblyAngularVelocity = flat:Cross(Vector3.yAxis) * -(7 + math.random() * 4)
+
+	if isHeadshot and head then
+		pcall(function()
+			head:SetNetworkOwner(nil)
+		end)
+		head.AssemblyLinearVelocity = flat * 26 + Vector3.new((math.random() - 0.5) * 10, 38, (math.random() - 0.5) * 10)
+		head.AssemblyAngularVelocity = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 30
+		-- spray from the neck
+		local spray = Instance.new("ParticleEmitter")
+		spray.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		spray.Color = ColorSequence.new(Color3.fromRGB(150, 10, 20))
+		spray.Size = NumberSequence.new(0.6 * scale, 0)
+		spray.Lifetime = NumberRange.new(0.3, 0.6)
+		spray.Speed = NumberRange.new(10, 18)
+		spray.SpreadAngle = Vector2.new(25, 25)
+		spray.Acceleration = Vector3.new(0, -40, 0)
+		spray.EmissionDirection = Enum.NormalId.Top
+		spray.Rate = 0
+		spray.Parent = model:FindFirstChild("Torso") or root
+		spray:Emit(24)
+	end
+
+	-- dissolve: embers + ash rise as the body shrinks away
+	task.delay(DISSOLVE_AT, function()
+		if not model.Parent then
+			return
+		end
+		local torso = model:FindFirstChild("Torso")
+		if torso then
+			local ash = Instance.new("ParticleEmitter")
+			ash.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+			ash.Color = ColorSequence.new(Color3.fromRGB(255, 150, 60), Color3.fromRGB(80, 70, 60))
+			ash.LightEmission = 0.8
+			ash.Size = NumberSequence.new(0.5 * scale, 0)
+			ash.Lifetime = NumberRange.new(0.6, 1.1)
+			ash.Speed = NumberRange.new(2, 5)
+			ash.SpreadAngle = Vector2.new(180, 180)
+			ash.Acceleration = Vector3.new(0, 8, 0)
+			ash.Rate = 0
+			ash.Parent = torso
+			ash:Emit(26)
+		end
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and d.Transparency < 1 then
+				TweenService:Create(d, TweenInfo.new(DISSOLVE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Transparency = 1, Size = d.Size * 0.35 }):Play()
+			end
+		end
+	end)
+	task.delay(DISSOLVE_AT + DISSOLVE_TIME + 0.6, function()
 		model:Destroy()
 	end)
 end
