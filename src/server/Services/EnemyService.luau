@@ -24,6 +24,10 @@ local enemiesFolder: Folder
 local enemies = {} -- [Model] = data
 local aliveCount = 0
 
+local Remotes = require(game.ReplicatedStorage.Shared.Net.Remotes)
+local gameState: Folder
+local notify: RemoteEvent
+
 local mapRayParams = RaycastParams.new()
 mapRayParams.FilterType = Enum.RaycastFilterType.Include
 
@@ -239,6 +243,83 @@ local function makeElite(model: Model, spawnPos: Vector3)
 	model.Name = "Elite " .. model.Name
 end
 
+-- Boss: the Dust Titan (wave 10 finale). Scaled-up zombie, stone + ember look.
+-- Its health is published on GameState (BossName / BossHealth / BossMax) for the HUD bar.
+function EnemyService.SpawnBoss(wave: number, playerCount: number, pos: Vector3)
+	local b = EnemyConfig.Boss
+	local look = { DisplayName = b.DisplayName, BodyColor = Color3.fromRGB(120, 105, 92) }
+	local model = buildModel(look, pos)
+	model:ScaleTo(b.Scale)
+	model.Humanoid.HipHeight = HIP_HEIGHT * b.Scale
+	for _, d in model:GetChildren() do
+		if d:IsA("BasePart") then
+			if d.Name == "Eye" then
+				d.Color = Color3.fromRGB(255, 140, 40)
+			elseif d.Name == "Torso" then
+				d.Color = Color3.fromRGB(70, 58, 50)
+				d.Material = Enum.Material.Slate
+			elseif d.Name ~= "HumanoidRootPart" and d.Name ~= "Collider" then
+				d.Material = Enum.Material.Rock
+			end
+		end
+	end
+	local torso = model:FindFirstChild("Torso")
+	if torso then
+		-- glowing ember cracks
+		for i = -1, 1 do
+			local crack = Instance.new("Part")
+			crack.Name = "EmberCrack"
+			crack.Size = Vector3.new(0.15 * b.Scale, 1.4 * b.Scale, 0.05)
+			crack.Color = Color3.fromRGB(255, 120, 30)
+			crack.Material = Enum.Material.Neon
+			crack.CanCollide, crack.CanQuery, crack.Massless = false, false, true
+			crack.CFrame = torso.CFrame * CFrame.new(i * 0.5 * b.Scale, 0, -torso.Size.Z / 2 - 0.03) * CFrame.Angles(0, 0, math.rad(i * 25))
+			local w = Instance.new("WeldConstraint")
+			w.Part0, w.Part1 = torso, crack
+			w.Parent = crack
+			crack.Parent = model
+		end
+		local glow = Instance.new("PointLight")
+		glow.Color = Color3.fromRGB(255, 130, 50)
+		glow.Range = 24
+		glow.Brightness = 2
+		glow.Parent = torso
+	end
+	model:SetAttribute("Boss", true)
+	local humanoid = model.Humanoid
+	local maxHealth = math.floor(b.Health * (b.PlayerHealthMult[math.clamp(playerCount, 1, 4)] or 1))
+	humanoid.MaxHealth = maxHealth
+	humanoid.Health = maxHealth
+	humanoid.WalkSpeed = b.WalkSpeed
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CollisionGroup = "Enemies"
+		end
+	end
+	local finalCf = CFrame.new(pos + Vector3.new(0, (HIP_HEIGHT + 1) * b.Scale, 0))
+	local busyUntil = emergeAt(model, finalCf, b.Scale) + 0.8
+	CollectionService:AddTag(model, "Enemy")
+	local stats = {
+		Id = b.Id, DisplayName = b.DisplayName, BaseHealth = maxHealth,
+		WalkSpeed = b.WalkSpeed, RunSpeed = b.WalkSpeed, Damage = b.Damage,
+		AttackRange = b.AttackRange, AttackCooldown = b.AttackCooldown, AttackWindup = 0.5,
+	}
+	enemies[model] = {
+		busyUntil = busyUntil, lastTear = os.clock(), model = model, humanoid = humanoid,
+		root = model.PrimaryPart, stats = stats, damage = b.Damage, isBoss = true,
+		scale = b.Scale, dead = false, lastAttack = 0, nextGroan = 0, isRunner = false,
+		baseSpeed = b.WalkSpeed, waypoints = nil, waypointIndex = 0, lastPathTime = 0,
+		computingPath = false, lastPos = finalCf.Position, stuckTime = 0,
+		nextSlam = os.clock() + 4,
+	}
+	aliveCount += 1
+	gameState:SetAttribute("BossName", b.DisplayName)
+	gameState:SetAttribute("BossMax", maxHealth)
+	gameState:SetAttribute("BossHealth", maxHealth)
+	notify:FireAllClients("Message", { text = "The " .. b.DisplayName .. " rises", tone = "bad" })
+	return enemies[model]
+end
+
 function EnemyService.Spawn(enemyId: string, wave: number, opts)
 	local stats = EnemyConfig.Enemies[enemyId]
 	assert(stats, "Unknown enemy " .. tostring(enemyId))
@@ -417,6 +498,45 @@ function EnemyService.Slow(data, mult: number, duration: number)
 	end)
 end
 
+-- Set an enemy on fire: `dps` for `duration` seconds (refreshes, doesn't stack).
+-- onKill(data) is called if the fire finishes it, so the shooter gets the credit.
+function EnemyService.Burn(data, dps: number, duration: number, attacker: Player?, onKill)
+	if data.dead then
+		return
+	end
+	data.burnDps = math.max(data.burnDps or 0, dps)
+	local already = data.burnUntil and os.clock() < data.burnUntil
+	data.burnUntil = os.clock() + duration
+	if already then
+		return
+	end
+	local torso = data.model:FindFirstChild("Torso")
+	local fire
+	if torso then
+		fire = Instance.new("Fire")
+		fire.Size = 4
+		fire.Heat = 6
+		fire.Color = Color3.fromRGB(255, 120, 40)
+		fire.SecondaryColor = Color3.fromRGB(255, 220, 90)
+		fire.Parent = torso
+	end
+	task.spawn(function()
+		while not data.dead and os.clock() < data.burnUntil do
+			task.wait(0.5)
+			if data.dead then
+				break
+			end
+			if EnemyService.Damage(data, data.burnDps * 0.5, attacker, false, nil) and onKill then
+				onKill(data)
+			end
+		end
+		data.burnDps = nil
+		if fire then
+			fire:Destroy()
+		end
+	end)
+end
+
 -- Live enemies whose root is within `radius` of `pos` (optionally only on the XZ plane).
 function EnemyService.InRadius(pos: Vector3, radius: number, flat: boolean?): { any }
 	local list = {}
@@ -441,8 +561,13 @@ function EnemyService.Damage(data, amount: number, attacker: Player?, isHeadshot
 	end
 	local hum = data.humanoid
 	hum.Health = math.max(0, hum.Health - amount)
+	if data.isBoss then
+		gameState:SetAttribute("BossHealth", hum.Health)
+	end
 	if hum.Health > 0 then
-		flinch(data, isHeadshot)
+		if not data.isBoss then -- the Titan doesn't flinch
+			flinch(data, isHeadshot)
+		end
 		return false
 	end
 	data.dead = true
@@ -498,7 +623,7 @@ local function requestPath(data, targetPos: Vector3)
 	data.lastPathTime = os.clock()
 	task.spawn(function()
 		local path = PathfindingService:CreatePath({
-			AgentRadius = 2,
+			AgentRadius = 3, -- wider than the body: paths keep clear of wall corners
 			AgentHeight = 5,
 			AgentCanJump = true,
 			WaypointSpacing = 6,
@@ -526,7 +651,7 @@ local function followPath(data): boolean
 	end
 	local wp = wps[data.waypointIndex]
 	local flat = Vector3.new(wp.Position.X - data.root.Position.X, 0, wp.Position.Z - data.root.Position.Z)
-	if flat.Magnitude < 3 then
+	if flat.Magnitude < 2 then -- (was 3: switching early made zombies cut into corners)
 		data.waypointIndex += 1
 		if data.waypointIndex > #wps then
 			return false
@@ -579,7 +704,7 @@ local function relocate(data)
 		data.checkAt = nil
 		return
 	end
-	local scale = data.isElite and ProgressionConfig.Elite.Scale or 1
+	local scale = data.scale or (data.isElite and ProgressionConfig.Elite.Scale or 1)
 	data.barrier = nil
 	data.waypoints = nil
 	data.checkAt = nil
@@ -675,6 +800,38 @@ local function aiTick(dt: number)
 			root.AssemblyLinearVelocity = away * 22 + Vector3.new(0, -8, 0)
 		end
 
+		-- Titan ground slam: telegraphed ring, then damage + knockback inside it.
+		if data.isBoss and now >= (data.nextSlam or 0) and dist <= EnemyConfig.Boss.Slam.TriggerRange then
+			local s = EnemyConfig.Boss.Slam
+			data.nextSlam = now + s.Every
+			data.busyUntil = now + s.Windup + 0.4
+			hum:MoveTo(root.Position)
+			local center = root.Position - Vector3.new(0, (HIP_HEIGHT + 1) * (data.scale or 1), 0)
+			notify:FireAllClients("AbilityFx", { kind = "BossSlamWarn", pos = center, radius = s.Radius, delay = s.Windup })
+			task.delay(s.Windup, function()
+				if data.dead then
+					return
+				end
+				for _, char in PlayerService.GetAliveCharacters() do
+					local r = char:FindFirstChild("HumanoidRootPart")
+					local h = char:FindFirstChildOfClass("Humanoid")
+					if r and h then
+						local off = Vector3.new(r.Position.X - center.X, 0, r.Position.Z - center.Z)
+						if off.Magnitude <= s.Radius and math.abs(r.Position.Y - center.Y) < 10 then
+							h:TakeDamage(s.Damage * WaveConfig.DamageMultiplier(1))
+							local p = game.Players:GetPlayerFromCharacter(char)
+							if p then
+								local away = off.Magnitude > 0.1 and off.Unit or Vector3.xAxis
+								notify:FireClient(p, "Knockback", { vel = away * s.Knockback + Vector3.new(0, 30, 0) })
+							end
+						end
+					end
+				end
+				notify:FireAllClients("AbilityFx", { kind = "BossSlam", pos = center, radius = s.Radius })
+			end)
+			continue
+		end
+
 		-- Periodic groans so players can hear where the horde is (runners are noisier).
 		if now >= data.nextGroan then
 			playSound(data, "ZombieGroan")
@@ -742,9 +899,18 @@ local function aiTick(dt: number)
 				data.waypoints = nil
 				data.lastPathTime = 0
 				data.stuckTime = 0
+				-- snagged twice in a row while far from you: relocate instead of grinding a wall
+				data.snags = (data.snags or 0) + 1
+				if data.snags >= 2 and dist > 20 and not data.isBoss then
+					data.snags = 0
+					relocate(data)
+				end
 			end
 		else
 			data.stuckTime = 0
+			if moved > 2 then
+				data.snags = 0
+			end
 		end
 	end
 end
@@ -779,6 +945,11 @@ function EnemyService.Init()
 	enemiesFolder = Instance.new("Folder")
 	enemiesFolder.Name = "Enemies"
 	enemiesFolder.Parent = workspace
+
+	gameState = Remotes.GameState()
+	notify = Remotes.Get("Notify")
+	gameState:SetAttribute("BossMax", 0)
+	gameState:SetAttribute("BossHealth", 0)
 end
 
 function EnemyService.Start()

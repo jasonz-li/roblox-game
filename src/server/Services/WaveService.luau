@@ -28,6 +28,7 @@ local wave = 0
 local gameOver = false
 local killsThisWave = 0
 local totalThisWave = 0
+local bossDown = false
 
 local function setState(state: string)
 	gameState:SetAttribute("State", state)
@@ -48,18 +49,41 @@ local function runWave()
 	gameState:SetAttribute("Wave", wave)
 	PlayerService.SpawnAllDead()
 
-	totalThisWave = WaveConfig.EnemyCount(wave, #Players:GetPlayers())
+	local isBossWave = wave == GameConfig.Run.BossWave
+	local escorts = WaveConfig.EnemyCount(wave, #Players:GetPlayers())
+	totalThisWave = escorts + (isBossWave and 1 or 0)
 	killsThisWave = 0
+	bossDown = false
 	updateRemaining()
 	setState("Wave")
-	notify:FireAllClients("WaveStart", { wave = wave, elite = ProgressionConfig.IsEliteWave(wave) })
+	notify:FireAllClients("WaveStart", {
+		wave = wave,
+		of = GameConfig.Run.Waves,
+		elite = ProgressionConfig.IsEliteWave(wave),
+		boss = isBossWave and EnemyConfig.Boss.DisplayName or nil,
+	})
+
+	if isBossWave then
+		-- The Titan rises in the Main Street arena (or near you if that's still locked)
+		local layout = MapService.GetLayout()
+		local pos
+		if MapService.IsZoneUnlocked(1) and layout.BossArena then
+			local spots = layout.BossArena.BossSpawns
+			pos = spots[math.random(1, #spots)]
+		else
+			local info = MapService.GetEnemySpawn(true)
+			pos = info and info.pos or layout.PlayerSpawn
+		end
+		task.wait(1.5)
+		EnemyService.SpawnBoss(wave, #Players:GetPlayers(), pos)
+	end
 
 	local spawned = 0
 	local interval = WaveConfig.SpawnInterval(wave)
 	local eliteChance = ProgressionConfig.EliteChance(wave)
-	local cap = math.min(EnemyConfig.MaxAlive, WaveConfig.AliveCap(totalThisWave))
+	local cap = math.min(EnemyConfig.MaxAlive, WaveConfig.AliveCap(escorts) + (isBossWave and 1 or 0))
 	EnemyService.SetHunting(false)
-	while spawned < totalThisWave and not gameOver do
+	while spawned < escorts and not gameOver and not bossDown do
 		if EnemyService.AliveCount() < cap then
 			if EnemyService.Spawn("Shambler", wave, { elite = math.random() < eliteChance }) then
 				spawned += 1
@@ -117,9 +141,14 @@ local function mainLoop()
 		end
 		intermission(GameConfig.FirstIntermission)
 
+		local victory = false
 		while not gameOver do
 			runWave()
 			if gameOver then
+				break
+			end
+			if wave >= GameConfig.Run.Waves then
+				victory = true
 				break
 			end
 			waveReward()
@@ -127,17 +156,35 @@ local function mainLoop()
 			intermission(GameConfig.Intermission + (offered and ProgressionConfig.Offer.ExtraIntermission or 0))
 		end
 
-		setState("GameOver")
 		gameState:SetAttribute("FinalWave", wave)
-		DataService.EndRun(wave, ProgressionConfig.Rewards.ShardsPerWaveSurvived)
+		gameState:SetAttribute("BossMax", 0)
 		gameState:SetAttribute("RestartAt", workspace:GetServerTimeNow() + GameConfig.GameOverDuration)
-		notify:FireAllClients("GameOver", { wave = wave })
+		if victory then
+			setState("Victory")
+			for _, p in Players:GetPlayers() do
+				DataService.AddShards(p, GameConfig.Run.VictoryShards, "Dustwater cleared")
+			end
+			-- wave + 1 so every wave counts as survived
+			DataService.EndRun(wave + 1, ProgressionConfig.Rewards.ShardsPerWaveSurvived, true)
+			notify:FireAllClients("Victory", { wave = wave })
+		else
+			setState("GameOver")
+			DataService.EndRun(wave, ProgressionConfig.Rewards.ShardsPerWaveSurvived, false)
+			notify:FireAllClients("GameOver", { wave = wave })
+		end
 		task.wait(GameConfig.GameOverDuration)
 	end
 end
 
 function WaveService.GetWave(): number
 	return wave
+end
+
+-- Studio testing only (DevService): the next wave to start will be `n`.
+function WaveService.DevSetWave(n: number)
+	wave = math.max(0, n - 1)
+	gameState:SetAttribute("Wave", wave)
+	return "next wave = " .. n
 end
 
 function WaveService.Init()
@@ -149,9 +196,19 @@ function WaveService.Init()
 end
 
 function WaveService.Start()
-	EnemyService.EnemyDied:Connect(function()
+	EnemyService.EnemyDied:Connect(function(data)
 		killsThisWave += 1
 		updateRemaining()
+		if data.isBoss then
+			-- Titan down: every player is paid, the escort crumbles, the wave ends
+			bossDown = true
+			gameState:SetAttribute("BossHealth", 0)
+			for _, p in Players:GetPlayers() do
+				CurrencyService.Add(p, EnemyConfig.Boss.Points, EnemyConfig.Boss.DisplayName .. " slain")
+			end
+			notify:FireAllClients("AbilityFx", { kind = "BossDown", pos = data.root.Position })
+			task.defer(EnemyService.KillAll)
+		end
 	end)
 	PlayerService.AllPlayersDead:Connect(function()
 		if gameState:GetAttribute("State") == "Wave" then

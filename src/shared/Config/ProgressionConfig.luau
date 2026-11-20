@@ -62,7 +62,7 @@ local ProgressionConfig = {
 		SweepShows = 3, -- seconds the dots stay visible after a sweep
 	},
 	Elite = {
-		StartWave = 4,
+		StartWave = 3,
 		BaseChance = 0.06, -- per spawn at StartWave
 		ChancePerWave = 0.01,
 		MaxChance = 0.15,

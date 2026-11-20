@@ -19,6 +19,7 @@ local ORDER = {
 	"AbilityService",
 	"InteractionService",
 	"WaveService",
+	"DevService", -- Studio-only test hook (does nothing in live servers)
 }
 
 local loaded = {}

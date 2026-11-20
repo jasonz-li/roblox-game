@@ -14,6 +14,7 @@ local Remotes = require(game.ReplicatedStorage.Shared.Net.Remotes)
 local SoundController = require(script.Parent.SoundController)
 local CameraController = require(script.Parent.CameraController)
 local EffectsController = require(script.Parent.EffectsController)
+local ImpactController = require(script.Parent.ImpactController)
 
 local AbilityController = {}
 
@@ -193,6 +194,9 @@ function FX.GaleStep(d)
 		fadeAndDie(slash, 0.35)
 	end
 	SoundController.PlayAt("KnifeSwing", mid, 80, 0.8)
+	if d.by == player and (d.kills or 0) > 0 then
+		ImpactController.Play(d.kills >= 3 and "heavy" or "medium")
+	end
 end
 
 function FX.FrostNova(d)
@@ -220,7 +224,7 @@ function FX.Tempest(d)
 	end
 	SoundController.PlayAt("KnifeSwing", d.pos, 90, 0.65 + d.pulse * 0.08)
 	if d.by == player then
-		CameraController.Shake(0.4)
+		ImpactController.Play(d.pulse == 1 and "heavy" or "light")
 	end
 end
 
@@ -245,9 +249,94 @@ function FX.Starfall(d)
 	ring(d.pos, d.radius * 1.3, Color3.fromRGB(255, 220, 255), 0.8)
 	SoundController.PlayAt("Nuke", d.pos, 220, 1.2)
 	local cam = workspace.CurrentCamera
-	if cam and (cam.CFrame.Position - d.pos).Magnitude < 120 then
+	if d.by == player then
+		ImpactController.Play("heavy")
+	elseif cam and (cam.CFrame.Position - d.pos).Magnitude < 120 then
 		CameraController.Shake(1.2)
 	end
+end
+
+-- Forge signature effects
+function FX.Explosion(d)
+	local color = d.color or Color3.fromRGB(255, 140, 40)
+	local ball = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 1.5, Position = d.pos, Color = color, Transparency = 0.05 })
+	fadeAndDie(ball, 0.32, { Size = Vector3.one * d.radius * 1.6 })
+	local core = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 1, Position = d.pos, Color = Color3.fromRGB(255, 245, 220), Transparency = 0 })
+	fadeAndDie(core, 0.15, { Size = Vector3.one * d.radius * 0.8 })
+	ring(d.pos - Vector3.new(0, 0.2, 0), d.radius, color, 0.35, 0.2)
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = d.radius * 3
+	light.Brightness = 4
+	light.Parent = ball
+	SoundController.PlayAt("ShotgunShot", d.pos, 120, 0.55 + math.random() * 0.1)
+	local cam = workspace.CurrentCamera
+	if cam and (cam.CFrame.Position - d.pos).Magnitude < d.radius * 3 then
+		CameraController.Shake(0.35)
+	end
+end
+
+local function bolt(a: Vector3, b: Vector3)
+	-- jagged 3-segment lightning bolt
+	local pts = { a }
+	for i = 1, 2 do
+		local p = a:Lerp(b, i / 3) + Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 2.2
+		table.insert(pts, p)
+	end
+	table.insert(pts, b)
+	for i = 1, #pts - 1 do
+		local p0, p1 = pts[i], pts[i + 1]
+		local seg = fxPart({ Size = Vector3.new(0.18, 0.18, (p1 - p0).Magnitude), CFrame = CFrame.lookAt((p0 + p1) / 2, p1), Color = Color3.fromRGB(255, 245, 140), Transparency = 0 })
+		fadeAndDie(seg, 0.18)
+	end
+end
+
+function FX.Chain(d)
+	local from = d.from + Vector3.new(0, 1.5, 0)
+	for _, to in d.to do
+		bolt(from, to + Vector3.new(0, 1.5, 0))
+	end
+	SoundController.PlayAt("LaserShot", from, 90, 1.6)
+end
+
+-- Dust Titan
+function FX.BossSlamWarn(d)
+	-- red ring that tightens until the slam lands
+	local ring = fxPart({
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.2, d.radius * 2.6, d.radius * 2.6),
+		CFrame = CFrame.new(d.pos + Vector3.new(0, 0.25, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(255, 40, 40),
+		Transparency = 0.6,
+	})
+	TweenService:Create(ring, TweenInfo.new(d.delay, Enum.EasingStyle.Linear), { Size = Vector3.new(0.2, d.radius * 2, d.radius * 2), Transparency = 0.25 }):Play()
+	task.delay(d.delay, function()
+		ring:Destroy()
+	end)
+	SoundController.PlayAt("ZombieAttack", d.pos, 160, 0.45)
+end
+
+function FX.BossSlam(d)
+	ring(d.pos, d.radius * 1.2, Color3.fromRGB(200, 160, 110), 0.6, 1.2)
+	local dust = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 6, Position = d.pos, Color = Color3.fromRGB(170, 140, 100), Material = Enum.Material.SmoothPlastic, Transparency = 0.3 })
+	fadeAndDie(dust, 0.7, { Size = Vector3.new(d.radius * 2.4, 6, d.radius * 2.4) })
+	SoundController.PlayAt("Nuke", d.pos, 200, 0.6)
+	local cam = workspace.CurrentCamera
+	if cam then
+		local dist = (cam.CFrame.Position - d.pos).Magnitude
+		if dist < d.radius + 6 then
+			ImpactController.Play("heavy")
+		elseif dist < 80 then
+			CameraController.Shake(1.5)
+		end
+	end
+end
+
+function FX.BossDown(d)
+	local boom = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 6, Position = d.pos, Color = Color3.fromRGB(255, 160, 60), Transparency = 0.1 })
+	fadeAndDie(boom, 1.2, { Size = Vector3.one * 60 })
+	SoundController.PlayAt("Nuke", d.pos, 400, 0.8)
+	ImpactController.Play("heavy")
 end
 
 ----------------------------------------------------------------------
@@ -361,6 +450,11 @@ function AbilityController.Start()
 	Remotes.Get("Notify").OnClientEvent:Connect(function(kind, data)
 		if kind == "AbilityFx" and FX[data.kind] then
 			FX[data.kind](data)
+		elseif kind == "Knockback" and typeof(data.vel) == "Vector3" then
+			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if root then
+				root.AssemblyLinearVelocity = data.vel
+			end
 		end
 	end)
 

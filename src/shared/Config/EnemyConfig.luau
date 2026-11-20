@@ -29,8 +29,25 @@ local Enemies: { [string]: EnemyStats } = {
 	},
 }
 
+-- Boss (wave 10 finale). Built from the zombie model, scaled up; PLACEHOLDER art.
+local Boss = {
+	Id = "Titan",
+	DisplayName = "Dust Titan",
+	Health = 9000, -- solo; x PlayerHealthMult per extra player
+	PlayerHealthMult = { 1, 1.6, 2.2, 2.8 },
+	Scale = 2.6,
+	WalkSpeed = 13,
+	Damage = 45,
+	AttackRange = 8,
+	AttackCooldown = 1.6,
+	-- Ground slam: telegraphed ring, then damage + knockback inside it
+	Slam = { Every = 7, Windup = 1.1, Radius = 16, Damage = 40, Knockback = 70, TriggerRange = 18 },
+	Points = 2000, -- to every player when it dies
+}
+
 local EnemyConfig = {
 	Enemies = Enemies,
+	Boss = Boss,
 	MaxAlive = 30,
 	AiTickRate = 0.2, -- seconds between AI updates
 	PathRecomputeInterval = 1.5,

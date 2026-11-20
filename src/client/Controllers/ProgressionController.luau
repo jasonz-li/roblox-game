@@ -327,7 +327,8 @@ function ProgressionController.Start()
 	refreshShards()
 	local gameState = Remotes.GameState()
 	gameState:GetAttributeChangedSignal("State"):Connect(function()
-		if gameState:GetAttribute("State") ~= "GameOver" then
+		local s = gameState:GetAttribute("State")
+		if s ~= "GameOver" and s ~= "Victory" then
 			ui.summary.Visible = false
 		end
 	end)

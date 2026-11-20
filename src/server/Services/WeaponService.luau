@@ -193,6 +193,71 @@ local function traceBullet(origin, direction, range, pierce, claimedPart)
 end
 
 ----------------------------------------------------------------------
+-- Forge signature effects (explosions, chain lightning, fire, shock)
+----------------------------------------------------------------------
+
+-- Points + streak for a kill made by an effect (blast, arc, burn)
+local function creditKill(player: Player, isHead: boolean, label: string)
+	if not player.Parent then
+		return
+	end
+	CurrencyService.AddKill(player)
+	local mult = ProgressionService.OnKill(player, isHead)
+	local base = isHead and GameConfig.Points.HeadshotKill or GameConfig.Points.Kill
+	CurrencyService.Add(player, math.floor(base * mult), label, true)
+end
+
+local notifyRemote: RemoteEvent
+
+local function explode(player: Player, pos: Vector3, cfg, dmgMult: number, report)
+	local n = 0
+	for _, data in EnemyService.InRadius(pos, cfg.Radius) do
+		local d = (data.root.Position - pos).Magnitude
+		local falloff = 1 - 0.5 * math.clamp(d / cfg.Radius, 0, 1) -- full at the center, half at the edge
+		local dmg = cfg.Damage * dmgMult * falloff
+		local away = data.root.Position - pos
+		local killed = EnemyService.Damage(data, dmg, player, false, (away.Magnitude > 0.1 and away.Unit or Vector3.yAxis) + Vector3.new(0, 0.8, 0))
+		if killed then
+			creditKill(player, false, "Blast")
+		end
+		n += 1
+		if #report < 12 then
+			table.insert(report, { data.model, data.root.Position, math.floor(dmg + 0.5), false, killed })
+		end
+	end
+	notifyRemote:FireAllClients("AbilityFx", { kind = "Explosion", pos = pos, radius = cfg.Radius, color = cfg.Color })
+	return n
+end
+
+local function chain(player: Player, from, damage: number, cfg, alreadyHit, report)
+	local arcs = {}
+	local origin = from.root.Position
+	local candidates = EnemyService.InRadius(origin, cfg.Range)
+	table.sort(candidates, function(a, b)
+		return (a.root.Position - origin).Magnitude < (b.root.Position - origin).Magnitude
+	end)
+	for _, data in candidates do
+		if #arcs >= cfg.Count then
+			break
+		end
+		if data ~= from and not alreadyHit[data] then
+			alreadyHit[data] = true
+			local killed = EnemyService.Damage(data, damage * cfg.Mult, player, false, nil)
+			if killed then
+				creditKill(player, false, "Chain")
+			end
+			table.insert(arcs, data.root.Position)
+			if #report < 12 then
+				table.insert(report, { data.model, data.root.Position, math.floor(damage * cfg.Mult + 0.5), false, killed })
+			end
+		end
+	end
+	if #arcs > 0 then
+		notifyRemote:FireAllClients("AbilityFx", { kind = "Chain", from = origin, to = arcs })
+	end
+end
+
+----------------------------------------------------------------------
 -- Remote handlers
 ----------------------------------------------------------------------
 
@@ -253,6 +318,8 @@ local function onFire(player: Player, origin, directions, claims)
 	local dmgMult = ProgressionConfig.DamageMult(player)
 	local headMult = stats.HeadshotMultiplier * ProgressionConfig.HeadshotMult(player)
 
+	local fx = stats.Effects
+	local chained = {}
 	for i, dir in dirs do
 		local claimed = claims[i]
 		if claimed == false then
@@ -260,7 +327,8 @@ local function onFire(player: Player, origin, directions, claims)
 		end
 		local hits, endPos = traceBullet(origin, dir, stats.Range, stats.Pierce, claimed)
 		firstEnd = firstEnd or endPos
-		for _, h in hits do
+		local headPos
+		for hi, h in hits do
 			local isHead = h.part.Name == "Head"
 			local damage = stats.Damage * dmgMult * (isHead and headMult or 1) * (PIERCE_FALLOFF ^ h.index)
 			if instaKill then
@@ -279,10 +347,34 @@ local function onFire(player: Player, origin, directions, claims)
 			anyHead = anyHead or isHead
 			if killed then
 				anyKill = true
-				CurrencyService.AddKill(player)
-				local mult = ProgressionService.OnKill(player, isHead)
-				local base = isHead and GameConfig.Points.HeadshotKill or GameConfig.Points.Kill
-				CurrencyService.Add(player, math.floor(base * mult), isHead and "Headshot" or "Kill", true)
+				creditKill(player, isHead, isHead and "Headshot" or "Kill")
+			end
+			if isHead and not headPos then
+				headPos = h.pos
+			end
+			-- Forge signature effects on the enemy that was hit
+			if fx and not killed then
+				if fx.Burn then
+					EnemyService.Burn(h.enemy, fx.Burn.Dps, fx.Burn.Duration, player, function()
+						creditKill(player, false, "Burn")
+					end)
+				end
+				if fx.Shock then
+					EnemyService.Slow(h.enemy, fx.Shock.Slow, fx.Shock.Time)
+				end
+			end
+			if fx and fx.Chain and hi == 1 then
+				chained[h.enemy] = true
+				chain(player, h.enemy, damage, fx.Chain, chained, report)
+			end
+		end
+		-- Explosive rounds burst where the bullet ends (wall, floor or zombie)
+		if fx and fx.Explosive then
+			local ex = fx.Explosive
+			if not ex.HeadshotOnly then
+				explode(player, endPos, ex, dmgMult, report)
+			elseif headPos then
+				explode(player, headPos, ex, dmgMult, report)
 			end
 		end
 	end
@@ -292,7 +384,10 @@ local function onFire(player: Player, origin, directions, claims)
 			shotFx:FireClient(other, player, origin, firstEnd, w.id, w.upgraded)
 		end
 	end
-	if next(hitEnemies) then
+	if next(hitEnemies) or #report > 0 then -- (#report: a blast or arc hit something)
+		for _, r in report do
+			anyKill = anyKill or r[5] == true
+		end
 		hitConfirm:FireClient(player, anyHead, anyKill, total, report, false)
 	end
 end
@@ -492,6 +587,7 @@ function WeaponService.Init()
 	hitConfirm = Remotes.Get("HitConfirm")
 	shotFx = Remotes.Get("ShotFx")
 	gameState = Remotes.GameState()
+	notifyRemote = Remotes.Get("Notify")
 end
 
 function WeaponService.Start()

@@ -7,18 +7,25 @@ local GameConfig = {
 	-- Which layout in src/server/Maps to load ("Dustwater" or the old "ShrineDistrict" test map)
 	ActiveMap = "Dustwater",
 
+	-- A run is a level: survive RunWaves waves; the last wave is a boss finale.
+	Run = {
+		Waves = 10,
+		BossWave = 10,
+		VictoryShards = 80, -- Spirit Shards for clearing the level (on top of per-wave shards)
+	},
+
 	-- Timings (seconds)
 	FirstIntermission = 6,
 	Intermission = 6, -- shorter breaks = faster pace
-	GameOverDuration = 10,
+	GameOverDuration = 12,
 
-	-- Points economy
+	-- Points economy (tuned for a 10-wave run: you can afford most of the map by wave 8)
 	Points = {
 		Start = 500,
 		Hit = 10,
-		Kill = 60,
-		HeadshotKill = 100,
-		WaveCompleteBase = 50, -- x wave number
+		Kill = 80,
+		HeadshotKill = 130,
+		WaveCompleteBase = 100, -- x wave number
 		WaveCompleteCap = 1000,
 	},
 

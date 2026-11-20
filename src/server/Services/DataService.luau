@@ -173,7 +173,7 @@ function DataService.StartRun()
 end
 
 -- Called at game over: wave rewards, records, then a summary to each player.
-function DataService.EndRun(finalWave: number, shardsPerWave: number)
+function DataService.EndRun(finalWave: number, shardsPerWave: number, victory: boolean?)
 	for _, player in Players:GetPlayers() do
 		local d = profiles[player]
 		if d then
@@ -193,6 +193,7 @@ function DataService.EndRun(finalWave: number, shardsPerWave: number)
 				bestStreak = d.BestStreak,
 				runStreak = player:GetAttribute("RunBestStreak") or 0,
 				newBestWave = newBestWave,
+				victory = victory == true,
 				saved = online and not d.unsaved,
 			})
 			task.spawn(save, player, false)

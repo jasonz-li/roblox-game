@@ -83,7 +83,7 @@ function cast.Swordsman(player, hero, root, aim)
 			end
 		end
 	end
-	notify:FireAllClients("AbilityFx", { kind = "GaleStep", by = player, from = from, to = to })
+	notify:FireAllClients("AbilityFx", { kind = "GaleStep", by = player, from = from, to = to, kills = kills })
 	return true
 end
 

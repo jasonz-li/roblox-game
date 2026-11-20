@@ -710,7 +710,9 @@ function GeometryApi.ramp(name: string, minX, minZ, maxX, maxZ, lowY: number, hi
 	else
 		padMin, padMax = Vector3.new(minX - 3, lowY - 0.6, minZ), Vector3.new(minX + 4, lowY + 0.2, maxZ)
 	end
-	GeometryApi.box(name .. "_FootPad", padMin, padMax, color or Color3.fromRGB(120, 115, 110), "Concrete")
+	-- Invisible: it only bridges the wedge's thin edge to the floor for pathfinding
+	-- (a visible slab poked through the sewer gate and looked like a random block).
+	GeometryApi.box(name .. "_FootPad", padMin, padMax, color or Color3.fromRGB(120, 115, 110), "Concrete", { Transparency = 1 })
 	return w
 end
 
@@ -841,10 +843,22 @@ local function playerRoots()
 	return roots
 end
 
+-- "Walking distance" estimate: height differences count 6x. A spawn 20 studs straight
+-- below you (the lab under the diner) is a ~200-stud walk, not 20; plain 3D distance
+-- picked those spawns and the zombies wandered lost underground.
 local function nearestDist(roots, pos)
 	local best = math.huge
 	for _, r in roots do
-		best = math.min(best, (r - pos).Magnitude)
+		local flat = Vector3.new(r.X - pos.X, 0, r.Z - pos.Z).Magnitude
+		best = math.min(best, flat + math.abs(r.Y - pos.Y) * 6)
+	end
+	return best
+end
+
+local function nearestHeightGap(roots, pos)
+	local best = math.huge
+	for _, r in roots do
+		best = math.min(best, math.abs(r.Y - pos.Y))
 	end
 	return best
 end
@@ -877,7 +891,10 @@ function MapService.GetEnemySpawn(groundOnly: boolean?)
 	end
 	for _, s in CollectionService:GetTagged("EnemySpawn") do
 		if s:IsDescendantOf(mapFolder) and unlocked[s:GetAttribute("Zone")] then
-			table.insert(grounds, s)
+			-- relocations (groundOnly) only use spawns on the same level as a player
+			if not groundOnly or #roots == 0 or nearestHeightGap(roots, s.Position) < 8 then
+				table.insert(grounds, s)
+			end
 		end
 	end
 	local useBarrier = not groundOnly and #barriers > 0 and (#grounds == 0 or math.random() < GameConfig.Barrier.BarrierSpawnChance)

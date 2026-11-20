@@ -13,6 +13,7 @@ local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.Progressi
 local GameConfig = require(game.ReplicatedStorage.Shared.Config.GameConfig)
 local Remotes = require(game.ReplicatedStorage.Shared.Net.Remotes)
 local CameraController = require(script.Parent.CameraController)
+local ImpactController = require(script.Parent.ImpactController)
 local EffectsController = require(script.Parent.EffectsController)
 local HudController = require(script.Parent.HudController)
 local SoundController = require(script.Parent.SoundController)
@@ -42,34 +43,36 @@ local stamina = GameConfig.Stamina.Max
 local exhausted = false
 local lastSprintAt = 0
 
--- Knife
-local KNIFE_TIME = 0.42
+-- Knife: a reverse-grip STAB into the neck (screen center), not a slash.
+local KNIFE_TIME = 0.46
 
 -- Knife keyframes (camera space). Blade points along the knife's -Z.
+-- ease: how each segment moves ("out" = fast start, "in" = accelerate, "snap" = very fast)
 local KNIFE_KEYS = {
-	{ t = 0.0, cf = CFrame.new(1.25, -1.5, -1.2) * CFrame.Angles(math.rad(-20), math.rad(35), math.rad(-60)) }, -- offscreen low right
-	{ t = 0.22, cf = CFrame.new(0.95, 0.15, -1.55) * CFrame.Angles(math.rad(15), math.rad(55), math.rad(-105)) }, -- wind-up, raised right
-	{ t = 0.5, cf = CFrame.new(-0.8, -0.6, -1.6) * CFrame.Angles(math.rad(-25), math.rad(-50), math.rad(-70)) }, -- slash end, low left
-	{ t = 1.0, cf = CFrame.new(-1.3, -1.7, -1.0) * CFrame.Angles(math.rad(-45), math.rad(-70), math.rad(-45)) }, -- follow-through offscreen
+	{ t = 0.0, cf = CFrame.new(1.0, -1.5, -0.5) * CFrame.Angles(math.rad(-35), math.rad(15), math.rad(-25)) }, -- offscreen, low right
+	{ t = 0.24, ease = "out", cf = CFrame.new(0.85, -0.3, -0.45) * CFrame.Angles(math.rad(8), math.rad(22), math.rad(-80)) }, -- pulled back to the shoulder (anticipation)
+	{ t = 0.42, ease = "snap", cf = CFrame.new(0.12, -0.22, -2.15) * CFrame.Angles(math.rad(4), math.rad(-6), math.rad(-88)) }, -- STAB: driven into center/neck
+	{ t = 0.6, ease = "out", cf = CFrame.new(0.16, -0.26, -1.95) * CFrame.Angles(math.rad(2), math.rad(-4), math.rad(-86)) }, -- buried, slight push
+	{ t = 1.0, ease = "in", cf = CFrame.new(0.95, -1.7, -0.3) * CFrame.Angles(math.rad(-40), math.rad(20), math.rad(-30)) }, -- yanked out, drops away
 }
 local function knifePose(t: number): CFrame
 	for i = 1, #KNIFE_KEYS - 1 do
 		local a, b = KNIFE_KEYS[i], KNIFE_KEYS[i + 1]
 		if t <= b.t then
 			local u = (t - a.t) / (b.t - a.t)
-			if i == 2 then
-				u = 1 - (1 - u) ^ 3 -- the slash: fast start, soft stop
-			elseif i == 1 then
+			if b.ease == "snap" then
+				u = 1 - (1 - u) ^ 5
+			elseif b.ease == "out" then
 				u = 1 - (1 - u) ^ 2
-			else
-				u = u * u -- follow-through accelerates away
+			elseif b.ease == "in" then
+				u = u * u
 			end
 			return a.cf:Lerp(b.cf, u)
 		end
 	end
 	return KNIFE_KEYS[#KNIFE_KEYS].cf
 end
-local meleeStartedAt, nextMeleeAt = -10, 0
+local meleeClock, nextMeleeAt = 10, 0 -- meleeClock: seconds into the current stab (paused during hit-stop)
 local knifeParts = {} -- { {part, offset} }
 
 ----------------------------------------------------------------------
@@ -155,6 +158,37 @@ local function buildViewmodel()
 	flashLight.Range = 12
 	flashLight.Brightness = 0
 	flashLight.Parent = flash
+
+	-- Dual wield (Forge signature, e.g. Twin Foxfire): drop the support arm and mirror
+	-- the gun + its hand onto the left side.
+	if v.Dual then
+		local keep = {}
+		for _, e in vmParts do
+			local n = e[1].Name
+			if n == "LeftGlove" or n == "LeftForearm" or n == "LeftSleeve" then
+				e[1]:Destroy()
+			else
+				table.insert(keep, e)
+			end
+		end
+		table.clear(vmParts)
+		local copies = {}
+		for _, e in keep do
+			table.insert(vmParts, e)
+			if e[1] ~= flash then
+				local c = e[2]
+				local rx, ry, rz = c:ToEulerAnglesXYZ()
+				local mirrored = CFrame.new(-1.9 - c.X, c.Y, c.Z) * CFrame.fromEulerAnglesXYZ(rx, -ry, -rz)
+				local p = e[1]:Clone()
+				p.Name = "Left" .. e[1].Name
+				p.Parent = viewmodel
+				table.insert(copies, { p, mirrored })
+			end
+		end
+		for _, e in copies do
+			table.insert(vmParts, e)
+		end
+	end
 
 	adsOffset = CFrame.new(0, -(v.AdsHeight or 0.33), -2.0)
 	viewmodel.Parent = workspace.CurrentCamera
@@ -360,7 +394,7 @@ local function melee()
 	end
 	local cfg = GameConfig.Melee
 	nextMeleeAt = now + cfg.Cooldown
-	meleeStartedAt = now
+	meleeClock = 0
 	nextShotAt = math.max(nextShotAt, now + KNIFE_TIME + 0.1)
 	if reloading then
 		reloading = false -- server cancels the reload too
@@ -424,7 +458,8 @@ local function update(dt)
 	local staminaMult = ProgressionConfig.StaminaMult(player) -- Second Wind upgrade
 	local maxStamina = sc.Max * staminaMult
 	local speedMult = PerkConfig.SpeedMultiplier(player)
-	local wantsSprint = sprintHeld and isMoving(hum) and not adsHeld and not triggerHeld and not reloading and not exhausted and stamina > 0
+	-- (reloading no longer cancels sprint: you can run and reload at the same time)
+	local wantsSprint = sprintHeld and isMoving(hum) and not adsHeld and not triggerHeld and not exhausted and stamina > 0
 	if wantsSprint then
 		local drain = sc.DrainPerSecond * (player:GetAttribute("Perk_SwiftStep") and sc.SwiftStepDrainMult or 1)
 		stamina = math.max(0, stamina - drain * dt)
@@ -490,9 +525,12 @@ local function update(dt)
 	local sway = CFrame.Angles(swayY * (1 - adsAlpha * 0.7), swayX * (1 - adsAlpha * 0.7), swayX * 0.5)
 	local kick = CFrame.new(0, 0, kickBack) * CFrame.Angles(math.rad(kickPitch), 0, 0)
 
-	-- Knife: wind-up (raise to upper right) → fast diagonal slash (down to lower left)
-	-- → follow-through off screen. The gun dips smoothly out of the way and comes back.
-	local meleeT = (os.clock() - meleeStartedAt) / KNIFE_TIME
+	-- Knife: pull back → stab into the center → yank out. The gun dips out of the way.
+	-- Hit-stop: the stab freezes for a few frames when it connects (impact frame).
+	if not ImpactController.IsHolding() then
+		meleeClock += dt
+	end
+	local meleeT = meleeClock / KNIFE_TIME
 	local meleePose = CFrame.new()
 	if meleeT < 1 then
 		local dip = meleeT < 0.15 and (meleeT / 0.15) or (meleeT > 0.7 and (1 - (meleeT - 0.7) / 0.3) or 1)
@@ -608,8 +646,26 @@ function WeaponController.Start()
 			SoundController.Play("KillConfirm", 1, 1.1)
 			CameraController.Punch(isHeadshot and 2.5 or 1.5)
 		end
+		-- Anime impact frames on the satisfying moments
+		local eliteKill = false
+		if isKill and typeof(hits) == "table" then
+			for _, h in hits do
+				if typeof(h) == "table" and h[5] == true and typeof(h[1]) == "Instance" and h[1]:GetAttribute("Elite") then
+					eliteKill = true
+				end
+			end
+		end
 		if isMelee then
-			CameraController.Shake(1.2)
+			-- the blade connects: freeze on the stab, heavy frame on a kill
+			if meleeClock < KNIFE_TIME * 0.6 then
+				meleeClock = math.max(meleeClock, KNIFE_TIME * 0.42)
+			end
+			ImpactController.Play(isKill and "heavy" or "medium")
+			CameraController.Kick(2.5, -1)
+		elseif eliteKill then
+			ImpactController.Play("heavy")
+		elseif isKill and isHeadshot then
+			ImpactController.Play("light")
 		end
 		if typeof(hits) == "table" then
 			for _, h in hits do

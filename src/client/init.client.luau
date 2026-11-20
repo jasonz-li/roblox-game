@@ -7,6 +7,7 @@ local ORDER = {
 	"CameraController",
 	"EffectsController",
 	"SoundController",
+	"ImpactController",
 	"HudController",
 	"ProgressionController",
 	"MinimapController",

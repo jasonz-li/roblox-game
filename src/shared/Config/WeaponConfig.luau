@@ -105,7 +105,7 @@ local Weapons: { [string]: WeaponStats } = {
 	},
 }
 
-local WeaponConfig = {
+local WeaponConfig: any = {
 	Weapons = Weapons,
 	Default = "Pistol",
 	MaxSlots = 2,
@@ -120,6 +120,55 @@ local WeaponConfig = {
 		Accent = Color3.fromRGB(255, 200, 60),
 	},
 }
+
+-- Spirit Forge signature upgrades: each weapon becomes something new, not just
+-- "more damage". Fields here override the doubled stats; `Effects` are handled by
+-- WeaponService on hit:
+--   Explosive = { Radius, Damage, HeadshotOnly?, Color }  blast at the bullet's end point
+--   Chain     = { Count, Range, Mult }                    lightning arcs to nearby zombies
+--   Burn      = { Dps, Duration }                         sets zombies on fire
+--   Shock     = { Slow, Time }                            slows what it hits
+local Signature: { [string]: { [string]: any } } = {
+	Pistol = {
+		Name = "Twin Foxfire",
+		Dual = true, -- two pistols, alternating shots
+		Damage = 70, RPM = 560, MagSize = 24, ReserveAmmo = 168, ReloadTime = 1.7,
+		ShotSound = "ShotgunShot", ShotPitch = 1.6,
+		Tracer = Color3.fromRGB(255, 140, 40),
+		Effects = { Explosive = { Radius = 9, Damage = 140, Color = Color3.fromRGB(255, 130, 40) } },
+	},
+	SMG = {
+		Name = "Hornet Queen",
+		RPM = 900, Tracer = Color3.fromRGB(255, 240, 90),
+		Effects = { Chain = { Count = 2, Range = 16, Mult = 0.6 } },
+	},
+	Shotgun = {
+		Name = "Oni's Breath",
+		Pellets = 10, Tracer = Color3.fromRGB(255, 90, 40),
+		Effects = { Burn = { Dps = 60, Duration = 3 } },
+	},
+	AssaultRifle = {
+		Name = "Raijin Thunderhead",
+		Tracer = Color3.fromRGB(120, 220, 255),
+		Effects = { Shock = { Slow = 0.45, Time = 1.5 }, Explosive = { Radius = 4, Damage = 45, Color = Color3.fromRGB(120, 220, 255) } },
+	},
+	Sniper = {
+		Name = "Moonlance",
+		Pierce = 99, Tracer = Color3.fromRGB(200, 170, 255),
+		Effects = { Explosive = { Radius = 12, Damage = 600, HeadshotOnly = true, Color = Color3.fromRGB(200, 160, 255) } },
+	},
+	LMG = {
+		Name = "Kaiju Inferno",
+		MagSize = 150, Tracer = Color3.fromRGB(255, 120, 40),
+		Effects = { Burn = { Dps = 40, Duration = 4 } },
+	},
+	SpiritRailgun = {
+		Name = "Void Rail",
+		Pierce = 99, Tracer = Color3.fromRGB(160, 60, 255),
+		Effects = { Explosive = { Radius = 7, Damage = 220, Color = Color3.fromRGB(170, 70, 255) } },
+	},
+}
+WeaponConfig.Signature = Signature
 
 local cache: { [string]: WeaponStats } = {}
 
@@ -136,16 +185,24 @@ function WeaponConfig.Get(id: string, upgraded: boolean?): WeaponStats?
 	if cache[key] then
 		return cache[key]
 	end
-	local up = table.clone(base)
+	local up = table.clone(base) :: any
 	local u = WeaponConfig.Upgrade
-	up.DisplayName = u.Prefix .. base.DisplayName
+	local sig = Signature[id] or {}
+	up.DisplayName = u.Prefix .. (sig.Name or base.DisplayName)
 	up.Damage = base.Damage * u.Damage
 	up.MagSize = math.floor(base.MagSize * u.Mag)
 	up.ReserveAmmo = math.floor(base.ReserveAmmo * u.Reserve)
-	local view = table.clone(base.View)
-	view.Accent = u.Accent
+	for _, k in { "Damage", "RPM", "MagSize", "ReserveAmmo", "ReloadTime", "Pellets", "Pierce", "ShotSound", "ShotPitch" } do
+		if sig[k] ~= nil then
+			up[k] = sig[k]
+		end
+	end
+	local view = table.clone(base.View) :: any
+	view.Accent = sig.Tracer or u.Accent
+	view.Dual = sig.Dual
 	up.View = view
-	up.TracerColor = u.Accent
+	up.TracerColor = sig.Tracer or u.Accent
+	up.Effects = sig.Effects
 	cache[key] = up
 	return up
 end

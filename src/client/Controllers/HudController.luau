@@ -199,6 +199,19 @@ local function buildWaveInfo()
 		Size = UDim2.fromOffset(400, 24),
 		Parent = gui,
 	})
+	-- Boss health bar (wave 10 finale)
+	ui.bossBar = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 90),
+		Size = UDim2.fromOffset(520, 34),
+		BackgroundTransparency = 1,
+		Visible = false,
+		Parent = gui,
+	})
+	ui.bossName = label({ Text = "", Font = Enum.Font.GothamBlack, TextSize = 16, TextColor3 = Color3.fromRGB(255, 150, 60), Size = UDim2.new(1, 0, 0, 16), Parent = ui.bossBar })
+	local bossBg = new("Frame", { Position = UDim2.fromOffset(0, 18), Size = UDim2.new(1, 0, 0, 12), BackgroundColor3 = Color3.fromRGB(30, 20, 20), BorderSizePixel = 0, Parent = ui.bossBar }, { corner(4), new("UIStroke", { Color = Color3.fromRGB(255, 120, 40), Thickness = 1.5, Transparency = 0.3 }) })
+	ui.bossFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(255, 110, 40), BorderSizePixel = 0, Parent = bossBg }, { corner(4) })
+
 	ui.banner = label({
 		Text = "",
 		TextSize = 64,
@@ -444,7 +457,7 @@ local function buildOverlays()
 		ZIndex = 10,
 		Parent = gui,
 	})
-	label({ Text = "OVERWHELMED", TextSize = 84, TextColor3 = Color3.fromRGB(255, 60, 90), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.4), Size = UDim2.fromOffset(900, 100), ZIndex = 11, Parent = ui.gameOver })
+	ui.gameOverTitle = label({ Text = "OVERWHELMED", TextSize = 84, TextColor3 = Color3.fromRGB(255, 60, 90), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.4), Size = UDim2.fromOffset(900, 100), ZIndex = 11, Parent = ui.gameOver })
 	ui.gameOverWave = label({ Text = "", Font = Enum.Font.GothamBold, TextSize = 30, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(900, 40), ZIndex = 11, Parent = ui.gameOver })
 	ui.gameOverTimer = label({ Text = "", Font = Enum.Font.GothamBold, TextSize = 20, TextColor3 = ACCENT2, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.6), Size = UDim2.fromOffset(900, 30), ZIndex = 11, Parent = ui.gameOver })
 	ui.deadNotice = label({ Text = "YOU ARE DOWN. Respawning next wave", Font = Enum.Font.GothamBold, TextSize = 24, TextColor3 = Color3.fromRGB(255, 120, 140), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.62), Size = UDim2.fromOffset(700, 30), Visible = false, Parent = gui })
@@ -595,7 +608,13 @@ function HudController.Start()
 		if kind == "Points" then
 			pointsPopup(data.amount)
 		elseif kind == "WaveStart" then
-			showBanner("WAVE " .. data.wave, data.elite and "ELITE WAVE: burning zombies drop rewards" or "Survive.", Color3.fromRGB(255, 70, 90))
+			if data.boss then
+				showBanner("FINAL WAVE", "The " .. data.boss .. " approaches. Bring it down.", Color3.fromRGB(255, 130, 40))
+			else
+				showBanner("WAVE " .. data.wave .. (data.of and (" / " .. data.of) or ""), data.elite and "ELITE WAVE: burning zombies drop rewards" or "Survive.", Color3.fromRGB(255, 70, 90))
+			end
+		elseif kind == "Victory" then
+			SoundController.Play("WaveStart", 1, 1.2)
 		elseif kind == "WaveComplete" then
 			showBanner("WAVE " .. data.wave .. " CLEARED", "+" .. data.bonus .. " pts", ACCENT2)
 		elseif kind == "Message" then
@@ -648,9 +667,25 @@ function HudController.Start()
 		-- Wave info
 		local state = gameState:GetAttribute("State")
 		local wave = gameState:GetAttribute("Wave") or 0
-		ui.gameOver.Visible = state == "GameOver"
-		if state == "Wave" then
-			ui.wave.Text = "WAVE " .. wave
+		ui.gameOver.Visible = state == "GameOver" or state == "Victory"
+		local bossMax = gameState:GetAttribute("BossMax") or 0
+		local bossHp = gameState:GetAttribute("BossHealth") or 0
+		ui.bossBar.Visible = state == "Wave" and bossMax > 0 and bossHp > 0
+		if ui.bossBar.Visible then
+			ui.bossName.Text = string.upper(gameState:GetAttribute("BossName") or "BOSS")
+			ui.bossFill.Size = UDim2.fromScale(math.clamp(bossHp / bossMax, 0, 1), 1)
+		end
+		if state == "Victory" then
+			ui.wave.Text = ""
+			ui.waveSub.Text = ""
+			ui.gameOverTitle.Text = "DUSTWATER CLEARED"
+			ui.gameOverTitle.TextColor3 = Color3.fromRGB(255, 215, 90)
+			ui.gameOverWave.Text = "All " .. (gameState:GetAttribute("FinalWave") or 10) .. " waves survived. The Titan has fallen."
+			local left = math.max(0, math.ceil((gameState:GetAttribute("RestartAt") or 0) - workspace:GetServerTimeNow()))
+			ui.gameOverTimer.Text = "New run in " .. left
+			ui.deadNotice.Visible = false
+		elseif state == "Wave" then
+			ui.wave.Text = "WAVE " .. wave .. " / 10"
 			ui.waveSub.Text = tostring(gameState:GetAttribute("EnemiesRemaining") or 0) .. " ENEMIES REMAINING"
 		elseif state == "Intermission" then
 			local left = math.max(0, math.ceil((gameState:GetAttribute("IntermissionEndsAt") or 0) - workspace:GetServerTimeNow()))
@@ -659,6 +694,8 @@ function HudController.Start()
 		elseif state == "GameOver" then
 			ui.wave.Text = ""
 			ui.waveSub.Text = ""
+			ui.gameOverTitle.Text = "OVERWHELMED"
+			ui.gameOverTitle.TextColor3 = Color3.fromRGB(255, 60, 90)
 			local final = gameState:GetAttribute("FinalWave") or wave
 			ui.gameOverWave.Text = "You survived " .. math.max(0, final - 1) .. " wave" .. (final - 1 == 1 and "" or "s") .. " (fell on wave " .. final .. ")"
 			local left = math.max(0, math.ceil((gameState:GetAttribute("RestartAt") or 0) - workspace:GetServerTimeNow()))
