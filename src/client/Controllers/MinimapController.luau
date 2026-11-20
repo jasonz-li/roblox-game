@@ -25,6 +25,7 @@ local gui: ScreenGui
 local pivot: Frame
 local world: Frame
 local mapLayer: Frame -- footprints (rebuilt when the map is)
+local lastCullPos: Vector3? = nil
 local origin = Vector2.zero -- world XZ of the world frame's top-left
 local dots = {}
 local mates = {}
@@ -57,20 +58,43 @@ end
 
 local ROAD_NAMES = { MainStreet = true, ElmLane = true, LoopRoad = true, GasApron = true, MotelLot = true, Alley = true, AlleyPassage = true }
 
+-- Circular clipping, done by hand (rounded/CanvasGroup clipping didn't work here):
+-- every map piece is cut into tiles of at most TILE studs, and each frame tiles
+-- whose center + radius fall outside the circle are hidden.
+local TILE = 6
+local cullables = {} -- { frame, x, z, r (studs) }
+
+local function addCullable(frame: GuiObject, x: number, z: number, r: number)
+	table.insert(cullables, { frame, x, z, r })
+end
+
 local function rect(part: BasePart, color: Color3, transparency: number, z: number)
 	local cf = part.CFrame
 	local _, yaw, _ = cf:ToOrientation()
-	new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = toMap(cf.Position.X, cf.Position.Z),
-		Size = UDim2.fromOffset(math.max(1.5, part.Size.X * SCALE), math.max(1.5, part.Size.Z * SCALE)),
-		Rotation = -math.deg(yaw),
-		BackgroundColor3 = color,
-		BackgroundTransparency = transparency,
-		BorderSizePixel = 0,
-		ZIndex = z,
-		Parent = mapLayer,
-	})
+	local flat = CFrame.new(cf.Position) * CFrame.Angles(0, yaw, 0)
+	local sx, sz = part.Size.X, part.Size.Z
+	local nx, nz = math.max(1, math.ceil(sx / TILE)), math.max(1, math.ceil(sz / TILE))
+	local tx, tz = sx / nx, sz / nz
+	local r = math.sqrt(tx * tx + tz * tz) / 2
+	for i = 0, nx - 1 do
+		for j = 0, nz - 1 do
+			local p = flat * Vector3.new(-sx / 2 + (i + 0.5) * tx, 0, -sz / 2 + (j + 0.5) * tz)
+			local f = new("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = toMap(p.X, p.Z),
+				-- +0.6px overlap so tiles don't show seams
+				Size = UDim2.fromOffset(math.max(1.5, tx * SCALE + 0.6), math.max(1.5, tz * SCALE + 0.6)),
+				Rotation = -math.deg(yaw),
+				BackgroundColor3 = color,
+				BackgroundTransparency = transparency,
+				BorderSizePixel = 0,
+				ZIndex = z,
+				Visible = false,
+				Parent = mapLayer,
+			})
+			addCullable(f, p.X, p.Z, r)
+		end
+	end
 end
 
 local function drawMap()
@@ -82,6 +106,8 @@ local function drawMap()
 	for _, c in mapLayer:GetChildren() do
 		c:Destroy()
 	end
+	table.clear(cullables)
+	lastCullPos = nil -- new tiles start hidden: re-cull next frame
 	-- bounds from the ground
 	local minX, minZ, maxX, maxZ = math.huge, math.huge, -math.huge, -math.huge
 	for _, p in map:GetDescendants() do
@@ -97,7 +123,7 @@ local function drawMap()
 	end
 	origin = Vector2.new(minX, minZ)
 	world.Size = UDim2.fromOffset((maxX - minX) * SCALE, (maxZ - minZ) * SCALE)
-	new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(70, 58, 46), BorderSizePixel = 0, ZIndex = 1, Parent = mapLayer })
+	-- (the ground color is the circle's own background)
 
 	for _, p in map:GetDescendants() do
 		if not p:IsA("BasePart") then
@@ -121,6 +147,7 @@ local function drawMarkers()
 	for _, c in markerFolder:GetChildren() do
 		c:Destroy()
 	end
+	lastCullPos = nil
 	for _, p in CollectionService:GetTagged("Interactable") do
 		if not p:IsA("BasePart") then
 			continue
@@ -129,7 +156,7 @@ local function drawMarkers()
 		if kind == "Door" then
 			local cf = p.CFrame
 			local _, yaw, _ = cf:ToOrientation()
-			new("Frame", {
+			local f = new("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = toMap(cf.Position.X, cf.Position.Z),
 				Size = UDim2.fromOffset(math.max(3, p.Size.X * SCALE), math.max(3, p.Size.Z * SCALE)),
@@ -137,20 +164,24 @@ local function drawMarkers()
 				BackgroundColor3 = Color3.fromRGB(255, 120, 40),
 				BorderSizePixel = 0,
 				ZIndex = 4,
+				Visible = false,
 				Parent = markerFolder,
 			})
+			f:SetAttribute("W", Vector3.new(cf.Position.X, math.max(p.Size.X, p.Size.Z) / 2, cf.Position.Z))
 		elseif kind == "Perk" or kind == "MysteryBox" or kind == "Forge" then
 			local perk = kind == "Perk" and PerkConfig.Perks[p:GetAttribute("Id")]
 			local color = perk and perk.Color or (kind == "MysteryBox" and Color3.fromRGB(255, 215, 90) or Color3.fromRGB(255, 200, 120))
-			new("Frame", {
+			local f = new("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = toMap(p.Position.X, p.Position.Z),
 				Size = UDim2.fromOffset(7, 7),
 				BackgroundColor3 = color,
 				BorderSizePixel = 0,
 				ZIndex = 5,
+				Visible = false,
 				Parent = markerFolder,
 			}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }), new("UIStroke", { Thickness = 1, Color = Color3.new(0, 0, 0), Transparency = 0.3 }) })
+			f:SetAttribute("W", Vector3.new(p.Position.X, 4, p.Position.Z))
 		end
 	end
 end
@@ -161,25 +192,25 @@ end
 
 local function build()
 	gui = new("ScreenGui", { Name = "Minimap", ResetOnSpawn = false, IgnoreGuiInset = true, Parent = player:WaitForChild("PlayerGui") })
-	-- Plain clipping frame (not a CanvasGroup: those didn't clip here). Clipping still
-	-- works because only the content inside is rotated, never this frame.
+	-- Ground-colored circle. Its contents are kept inside the circle by per-tile culling
+	-- (see rect/update); ClipsDescendants is a square backstop.
 	local frame = new("Frame", {
 		Name = "Map",
 		Position = UDim2.fromOffset(24, 24),
 		Size = UDim2.fromOffset(SIZE, SIZE),
-		BackgroundColor3 = Color3.fromRGB(14, 12, 22),
-		BackgroundTransparency = 0.15,
+		BackgroundColor3 = Color3.fromRGB(70, 58, 46),
+		BackgroundTransparency = 0.1,
 		ClipsDescendants = true,
 		Parent = gui,
-	}, { new("UICorner", { CornerRadius = UDim.new(0, 14) }) })
-	-- border drawn on top so it stays crisp
+	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	-- border ring drawn on top so it stays crisp and hides tile edges at the rim
 	new("Frame", {
 		Position = UDim2.fromOffset(24, 24),
 		Size = UDim2.fromOffset(SIZE, SIZE),
 		BackgroundTransparency = 1,
 		ZIndex = 12,
 		Parent = gui,
-	}, { new("UICorner", { CornerRadius = UDim.new(0, 14) }), new("UIStroke", { Color = Color3.fromRGB(80, 220, 255), Thickness = 2, Transparency = 0.3 }) })
+	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }), new("UIStroke", { Color = Color3.fromRGB(80, 220, 255), Thickness = 3, Transparency = 0.2 }) })
 
 	pivot = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, Parent = frame })
 	world = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(10, 10), Parent = pivot })
@@ -270,6 +301,22 @@ local function update()
 	pivot.Rotation = -math.deg(heading)
 	world.Position = UDim2.fromOffset(-(pos.X - origin.X) * SCALE, -(pos.Z - origin.Y) * SCALE)
 
+	-- Circle culling (rotation doesn't change distance, so only redo it when you move)
+	if not lastCullPos or (pos - lastCullPos).Magnitude > 0.75 then
+		lastCullPos = pos
+		for _, c in cullables do
+			local dx, dz = c[2] - pos.X, c[3] - pos.Z
+			c[1].Visible = math.sqrt(dx * dx + dz * dz) + c[4] <= RANGE
+		end
+		for _, f in markerFolder:GetChildren() do
+			local w = f:GetAttribute("W")
+			if w then
+				local dx, dz = w.X - pos.X, w.Z - pos.Z
+				f.Visible = math.sqrt(dx * dx + dz * dz) + w.Y <= RANGE
+			end
+		end
+	end
+
 	-- north marker on the rim
 	local r = SIZE / 2 - 2
 	local cx, cy = 24 + SIZE / 2, 24 + SIZE / 2
@@ -308,7 +355,7 @@ local function update()
 	end
 	for i, dot in dots do
 		local e = list[i]
-		dot.Visible = e ~= nil and fade < 1
+		dot.Visible = e ~= nil and fade < 1 and Vector2.new(e.pos.X - pos.X, e.pos.Z - pos.Z).Magnitude <= RANGE - 3
 		if e then
 			dot.Position = toMap(e.pos.X, e.pos.Z)
 			dot.BackgroundTransparency = fade
@@ -330,7 +377,7 @@ local function update()
 					d = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(7, 7), BackgroundColor3 = Color3.fromRGB(80, 220, 255), BorderSizePixel = 0, ZIndex = 8, Parent = world }, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 					mates[others] = d
 				end
-				d.Visible = true
+				d.Visible = Vector2.new(pr.Position.X - pos.X, pr.Position.Z - pos.Z).Magnitude <= RANGE - 3
 				d.Position = toMap(pr.Position.X, pr.Position.Z)
 			end
 		end
