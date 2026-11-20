@@ -849,7 +849,20 @@ local function aiTick(dt: number)
 					hum:MoveTo(Vector3.new(outside.X, root.Position.Y, outside.Z))
 				elseif (barrier:GetAttribute("Boards") or 0) > 0 then
 					hum:MoveTo(root.Position)
-					if now - data.lastTear >= GameConfigRef.Barrier.TearInterval then
+					-- Slow, defendable tearing only where a player is near; at windows nobody is
+				-- watching they rip through, so far-off windows don't just stall the wave.
+				local bcfg = GameConfigRef.Barrier
+				local watched = false
+				local inside = barrier:GetAttribute("Inside")
+				for _, char in characters do
+					local r = char:FindFirstChild("HumanoidRootPart")
+					if r and inside and (r.Position - inside).Magnitude <= (bcfg.UnwatchedRange or 35) then
+						watched = true
+						break
+					end
+				end
+				local tearEvery = watched and bcfg.TearInterval or (bcfg.TearIntervalUnwatched or bcfg.TearInterval)
+				if now - data.lastTear >= tearEvery then
 						data.lastTear = now
 						BarrierService.TearBoard(barrier)
 						if now >= data.nextGroan then

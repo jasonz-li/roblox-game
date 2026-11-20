@@ -891,17 +891,44 @@ end
 -- Spawn rotation (zombies-style): each entry point rests between uses, and picks are
 -- weighted toward the points that have been idle longest, so zombies arrive spread
 -- around you instead of in one clump.
-local WINDOW_COOLDOWN = 4 -- seconds before the same window is used again
-local GROUND_COOLDOWN = 2.5
-local MAX_AT_WINDOW = 2 -- zombies allowed outside one window at once
+local WINDOW_COOLDOWN = 2.5 -- seconds before the same window is used again
+local GROUND_COOLDOWN = 2
+local MAX_AT_WINDOW = 3 -- zombies allowed outside one window at once
 local lastUsed = {} -- [Instance] = os.clock()
+local lastDir = nil -- flat direction (player -> spawn) of the previous zombie
 local occupancy -- function(barrier) -> zombies queued outside it (set by EnemyService)
 
-local function rotate(list, now)
+local function spawnPos(c): Vector3
+	return c:IsA("BasePart") and c:GetAttribute("Inside") or c.Position
+end
+
+local function dirFromPlayers(roots, pos: Vector3): Vector3?
+	local best, bd = nil, math.huge
+	for _, r in roots do
+		local d = (r - pos).Magnitude
+		if d < bd then
+			best, bd = r, d
+		end
+	end
+	if not best then
+		return nil
+	end
+	local flat = Vector3.new(pos.X - best.X, 0, pos.Z - best.Z)
+	return flat.Magnitude > 0.1 and flat.Unit or nil
+end
+
+-- Weighted pick: idle-longest first, and away from the direction the last zombie
+-- came from (opposite side counts double), so the horde arrives from all around you.
+local function rotate(list, now, roots)
 	local total, weights = 0, {}
 	for i, c in list do
 		local idle = math.min(12, now - (lastUsed[c] or 0))
-		weights[i] = 1 + idle
+		local w = 1 + idle
+		local dir = roots and dirFromPlayers(roots, spawnPos(c))
+		if dir and lastDir then
+			w *= 1.5 - 0.5 * dir:Dot(lastDir) -- 1x same side .. 2x opposite side
+		end
+		weights[i] = w
 		total += weights[i]
 	end
 	local r = math.random() * total
@@ -950,8 +977,9 @@ function MapService.GetEnemySpawn(groundOnly: boolean?)
 	end
 	local useBarrier = #nearBarriers > 0 and (#grounds == 0 or math.random() < GameConfig.Barrier.BarrierSpawnChance)
 	if useBarrier then
-		local b = rotate(nearBarriers, now)
+		local b = rotate(nearBarriers, now, roots)
 		lastUsed[b] = now
+		lastDir = dirFromPlayers(roots, b:GetAttribute("Inside")) or lastDir
 		local out = b:GetAttribute("Outside")
 		local side = (b:GetAttribute("Inside") - out).Unit:Cross(Vector3.yAxis)
 		return { pos = out - Vector3.new(0, 3, 0) + side * math.random(-15, 15) / 10, barrier = b, emerge = false }
@@ -964,13 +992,14 @@ function MapService.GetEnemySpawn(groundOnly: boolean?)
 			table.insert(fresh, s)
 		end
 	end
-	local s = #fresh > 0 and rotate(fresh, now) or pickNear(grounds, function(x)
+	local s = #fresh > 0 and rotate(fresh, now, roots) or pickNear(grounds, function(x)
 		return x.Position
 	end, roots, 85)
 	if not s then
 		return nil
 	end
 	lastUsed[s] = now
+	lastDir = dirFromPlayers(roots, s.Position) or lastDir
 	return { pos = s.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3)), barrier = nil, emerge = true }
 end
 

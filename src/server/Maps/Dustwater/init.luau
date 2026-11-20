@@ -122,6 +122,8 @@ return {
 	-- Ground spawns: zombies claw up out of the dirt here (fewer now that windows exist).
 	EnemySpawns = {
 		{ Zone = 0, Pos = V(0, 0, 218) }, { Zone = 0, Pos = V(-60, 0, 100) },
+		-- side yards: Elm Lane's windows are all north/south, these add east/west angles
+		{ Zone = 0, Pos = V(-52, 0, 194) }, { Zone = 0, Pos = V(56, 0, 104) }, { Zone = 0, Pos = V(-62, 0, 168) },
 		{ Zone = 1, Pos = V(-145, 0, -36) }, { Zone = 1, Pos = V(165, 0, -36) }, { Zone = 1, Pos = V(-40, 0, -38) }, { Zone = 1, Pos = V(100, 0, 6) },
 		{ Zone = 2, Pos = V(-160, 0, -105) }, { Zone = 2, Pos = V(-160, 0, 85) },
 		{ Zone = 3, Pos = V(-90, 0, -105) },

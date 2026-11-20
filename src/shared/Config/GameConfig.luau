@@ -77,13 +77,15 @@ local GameConfig = {
 	-- Boarded windows (zombie entry points)
 	Barrier = {
 		Boards = 6,
-		TearInterval = 1.5, -- seconds per board: a full window holds zombies ~9s
+		TearInterval = 1.5, -- seconds per board when a player is near: a full window holds ~9s
+		TearIntervalUnwatched = 0.5, -- nobody within UnwatchedRange: they rip through (~3s)
+		UnwatchedRange = 35,
 		RepairInterval = 0.6, -- hold E: one board back every this many seconds
 		RepairPoints = 15, -- per board rebuilt (big early on with the tighter economy)
 		SealBonus = 50, -- extra for putting the LAST board back (window fully sealed)
 		RepairPointsCapPerWave = 800, -- per player; only stops endless farming
 		VaultTime = 0.6,
-		BarrierSpawnChance = 0.9, -- windows are THE way in (when one is near you); else ground
+		BarrierSpawnChance = 0.7, -- windows are the main way in; ground spawns add other angles
 	},
 }
 
