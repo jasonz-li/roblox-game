@@ -124,13 +124,24 @@ local function buildViewmodel()
 	muzzle = addVmPart("Muzzle", Vector3.new(0.2, 0.2, 0.16), CFrame.new(0, 0.08, -(L / 2 + B + 0.08)), Color3.fromRGB(20, 20, 24))
 	addVmPart("Mag", Vector3.new(0.24, v.MagHeight, 0.35), CFrame.new(0, -0.21 - v.MagHeight / 2, -L * 0.15) * CFrame.Angles(math.rad(-10), 0, 0), v.Color)
 	if v.Stock then
-		addVmPart("Stock", Vector3.new(0.26, 0.36, 0.7), CFrame.new(0, -0.05, L / 2 + 0.35), v.Color:Lerp(Color3.new(1, 1, 1), 0.1))
+		-- set low so it drops out of the sight picture when aiming
+		addVmPart("Stock", Vector3.new(0.22, 0.28, 0.6), CFrame.new(0, -0.2, L / 2 + 0.3), v.Color:Lerp(Color3.new(1, 1, 1), 0.1))
 	end
 	if v.Scope then
 		addVmPart("Scope", Vector3.new(0.9, 0.22, 0.22), CFrame.new(0, 0.38, -0.1) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(20, 20, 26), Enum.Material.Metal, Enum.PartType.Cylinder)
 		addVmPart("ScopeGlass", Vector3.new(0.02, 0.2, 0.2), CFrame.new(0, 0.38, -0.56) * CFrame.Angles(0, math.rad(90), 0), v.Accent, Enum.Material.Neon, Enum.PartType.Cylinder)
 	else
-		addVmPart("Sight", Vector3.new(0.12, 0.1, 0.3), CFrame.new(0, 0.28, -L * 0.1), v.Accent, Enum.Material.Neon)
+		-- Iron sights: a notched rear sight at the back of the receiver and a thin front
+		-- post at the muzzle. Both tops sit on the sight line (y = 0.33), which ADS puts
+		-- exactly on the crosshair. (Was one chunky neon block that covered the target.)
+		local SIGHT_Y = 0.33
+		local rearZ = L * 0.3
+		for _, x in { -0.065, 0.065 } do
+			addVmPart("RearSight", Vector3.new(0.03, SIGHT_Y - 0.19, 0.05), CFrame.new(x, (0.21 + SIGHT_Y) / 2 - 0.01, rearZ), Color3.fromRGB(25, 25, 28), Enum.Material.Metal)
+		end
+		local frontZ = -(L / 2 + B - 0.06)
+		addVmPart("FrontPost", Vector3.new(0.035, SIGHT_Y - 0.15, 0.05), CFrame.new(0, (0.15 + SIGHT_Y) / 2 - 0.01, frontZ), Color3.fromRGB(25, 25, 28), Enum.Material.Metal)
+		addVmPart("FrontDot", Vector3.new(0.04, 0.04, 0.05), CFrame.new(0, SIGHT_Y - 0.02, frontZ), v.Accent, Enum.Material.Neon)
 	end
 	addVmPart("Accent", Vector3.new(0.34, 0.05, L * 0.6), CFrame.new(0, 0.13, -L * 0.08), v.Accent, Enum.Material.Neon)
 	-- Arms: gloved hands on the grip and under the barrel, forearms + sleeves running
@@ -191,7 +202,22 @@ local function buildViewmodel()
 		end
 	end
 
-	adsOffset = CFrame.new(0, -(v.AdsHeight or 0.33), -2.0)
+	-- Soft fill light so the gun and hands aren't black silhouettes at night
+	local body = viewmodel:FindFirstChild("Body")
+	if body then
+		local fill = Instance.new("PointLight")
+		fill.Name = "ViewmodelFill"
+		fill.Color = Color3.fromRGB(255, 225, 200)
+		fill.Range = 4
+		fill.Brightness = 0.9
+		fill.Shadows = false
+		fill.Parent = body
+	end
+
+	-- ADS: the sight line (y 0.33 above the body) on the crosshair, a little further out
+	-- so the gun frames the target. Dual pistols just come up and in a bit.
+	-- longer guns sit further out, so their stock/receiver don't fill the bottom of the screen
+	adsOffset = v.Dual and (HIP_OFFSET * CFrame.new(-0.35, 0.25, 0.25)) or CFrame.new(0, -(v.AdsHeight or 0.33), -(2.3 + L * 0.55))
 	viewmodel.Parent = workspace.CurrentCamera
 end
 
