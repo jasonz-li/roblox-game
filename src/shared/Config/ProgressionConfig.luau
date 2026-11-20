@@ -62,9 +62,9 @@ local ProgressionConfig = {
 	},
 	Streak = {
 		Window = 3.5, -- seconds to land the next kill
-		PerKill = 0.1, -- +0.1x per streak point
+		PerKill = 0.08, -- +0.08x per streak point
 		HeadshotPoints = 2, -- headshot kills count double
-		MaxMult = 2.5,
+		MaxMult = 2.0,
 		BreakOnHit = true, -- getting hit by a zombie ends the streak
 		-- Milestones pay Spirit Shards (saved, for the gacha) and in-run rewards.
 		-- Past the last one, every RepeatEvery more kills pays RepeatShards again.

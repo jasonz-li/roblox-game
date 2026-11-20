@@ -19,14 +19,15 @@ local GameConfig = {
 	Intermission = 6, -- shorter breaks = faster pace
 	GameOverDuration = 12,
 
-	-- Points economy (tuned for a 10-wave run: you can afford most of the map by wave 8)
+	-- Points economy. Tightened (was Kill 80 / Headshot 130 / wave 100x): points were
+	-- so plentiful that boarding windows was pointless. Early on, repairs now matter.
 	Points = {
 		Start = 500,
 		Hit = 10,
-		Kill = 80,
-		HeadshotKill = 130,
-		WaveCompleteBase = 100, -- x wave number
-		WaveCompleteCap = 1000,
+		Kill = 50,
+		HeadshotKill = 90,
+		WaveCompleteBase = 50, -- x wave number
+		WaveCompleteCap = 500,
 	},
 
 	-- Player
@@ -56,7 +57,7 @@ local GameConfig = {
 		LungeRange = 9, -- client lunges toward targets this close
 		LungeSpeed = 55,
 		Cooldown = 0.7,
-		KillPoints = 130,
+		KillPoints = 100,
 	},
 
 	-- M1 placeholder rule, now off: ammo comes from wall-buys and Max Ammo drops.
@@ -76,13 +77,13 @@ local GameConfig = {
 	-- Boarded windows (zombie entry points)
 	Barrier = {
 		Boards = 6,
-		TearInterval = 1.25, -- seconds per board a zombie needs
+		TearInterval = 1.5, -- seconds per board: a full window holds zombies ~9s
 		RepairInterval = 0.6, -- hold E: one board back every this many seconds
-		RepairPoints = 25, -- per board rebuilt (was 10: not worth doing)
-		SealBonus = 100, -- extra for putting the LAST board back (window fully sealed)
-		RepairPointsCapPerWave = 1500, -- per player; only stops endless farming
+		RepairPoints = 15, -- per board rebuilt (big early on with the tighter economy)
+		SealBonus = 50, -- extra for putting the LAST board back (window fully sealed)
+		RepairPointsCapPerWave = 800, -- per player; only stops endless farming
 		VaultTime = 0.6,
-		BarrierSpawnChance = 0.75, -- otherwise zombies climb out of the ground
+		BarrierSpawnChance = 0.9, -- windows are THE way in (when one is near you); else ground
 	},
 }
 

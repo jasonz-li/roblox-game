@@ -136,9 +136,10 @@ return {
 	-- boards off, then climb in. Axis/At must match a wall line in `Walls` (the gap is cut
 	-- automatically). Along = position along that wall; Inward = direction into play space.
 	Barriers = {
-		-- (moved clear of the houses after the Elm Lane cliffs came in to ±75)
-		{ Zone = 0, Axis = "z", At = -75, Along = 186, Inward = V(1, 0, 0), WallHeight = 56 },
-		{ Zone = 0, Axis = "z", At = 75, Along = 165, Inward = V(-1, 0, 0), WallHeight = 56 },
+		-- Elm Lane: on the town wall right by the street players actually use (hotspot
+		-- data). They used to sit on the side cliffs behind the houses, where nobody went.
+		{ Zone = 0, Axis = "x", At = 90, Along = -50, Inward = V(0, 0, 1), WallHeight = 28 },
+		{ Zone = 0, Axis = "x", At = 90, Along = 50, Inward = V(0, 0, 1), WallHeight = 28 },
 		{ Zone = 0, Axis = "x", At = 225, Along = -40, Inward = V(0, 0, -1), WallHeight = 56 },
 		{ Zone = 0, Axis = "x", At = 225, Along = 50, Inward = V(0, 0, -1), WallHeight = 56 },
 		-- Main Street: zombies pour in from the sealed-off field and junkyard
