@@ -18,7 +18,9 @@ export type WeaponStats = {
 	Id: string,
 	DisplayName: string,
 	Class: string,
-	FireMode: "Auto" | "Semi",
+	FireMode: "Auto" | "Semi" | "Burst",
+	BurstCount: number?,
+	Effects: { [string]: any }?, -- built-in effects (e.g. the Hanabi Launcher's explosive shells)
 	Damage: number, -- per pellet
 	HeadshotMultiplier: number,
 	RPM: number,
@@ -64,9 +66,10 @@ local Weapons: { [string]: WeaponStats } = {
 	},
 	Shotgun = {
 		Id = "Shotgun", DisplayName = "Oni Breaker", Class = "Shotgun", FireMode = "Semi",
-		Damage = 22, HeadshotMultiplier = 1.5, RPM = 85, MagSize = 6, ReserveAmmo = 48, ReloadTime = 2.6,
-		Range = 110, HipSpread = 5.5, AdsSpread = 4.0, RecoilKick = 3.2, RecoilSide = 0.8, AdsFov = 65,
-		Pellets = 8, Pierce = 0, ShotSound = "ShotgunShot", ShotPitch = 1.0,
+		-- buffed (playtest: "shotgun is bad"): was 22 dmg x8, spread 5.5, range 110, mag 6
+		Damage = 38, HeadshotMultiplier = 1.5, RPM = 100, MagSize = 8, ReserveAmmo = 56, ReloadTime = 2.4,
+		Range = 140, HipSpread = 3.8, AdsSpread = 2.8, RecoilKick = 3.2, RecoilSide = 0.8, AdsFov = 65,
+		Pellets = 9, Pierce = 0, ShotSound = "ShotgunShot", ShotPitch = 1.0,
 		WallCost = 1200, AmmoCost = 600, BoxWeight = 18,
 		View = { Length = 1.9, Barrel = 0.9, Color = Color3.fromRGB(70, 46, 36), Accent = Color3.fromRGB(255, 90, 60), Stock = true, MagHeight = 0.25 },
 	},
@@ -80,8 +83,9 @@ local Weapons: { [string]: WeaponStats } = {
 	},
 	Sniper = {
 		Id = "Sniper", DisplayName = "Tsukuyomi Longbow", Class = "Sniper", FireMode = "Semi",
-		Damage = 240, HeadshotMultiplier = 3.0, RPM = 55, MagSize = 5, ReserveAmmo = 30, ReloadTime = 3.0,
-		Range = 900, HipSpread = 5.0, AdsSpread = 0, RecoilKick = 4, RecoilSide = 0.5, AdsFov = 42,
+		-- buffed (playtest: "sniper is bad"): was 240 dmg, 55 rpm, mag 5, hip spread 5
+		Damage = 520, HeadshotMultiplier = 3.0, RPM = 75, MagSize = 6, ReserveAmmo = 42, ReloadTime = 2.5,
+		Range = 900, HipSpread = 2.5, AdsSpread = 0, RecoilKick = 4, RecoilSide = 0.5, AdsFov = 42,
 		-- collateral: a round punches through up to 5 zombies at full damage
 		Pellets = 1, Pierce = 5, PierceFalloff = 1, ShotSound = "HeavyShot", ShotPitch = 0.85,
 		TracerColor = Color3.fromRGB(180, 140, 255),
@@ -105,6 +109,34 @@ local Weapons: { [string]: WeaponStats } = {
 		TracerColor = Color3.fromRGB(255, 80, 200),
 		BoxWeight = 5,
 		View = { Length = 1.7, Barrel = 0.8, Color = Color3.fromRGB(240, 240, 255), Accent = Color3.fromRGB(255, 80, 200), Stock = false, MagHeight = 0.3 },
+	},
+	-- New for variety (Mystery Box)
+	Magnum = {
+		Id = "Magnum", DisplayName = "Kappa Magnum", Class = "Pistol", FireMode = "Semi",
+		Damage = 210, HeadshotMultiplier = 2.6, RPM = 190, MagSize = 6, ReserveAmmo = 54, ReloadTime = 2.0,
+		Range = 500, HipSpread = 1.4, AdsSpread = 0.2, RecoilKick = 3.0, RecoilSide = 0.6, AdsFov = 58,
+		Pellets = 1, Pierce = 1, PierceFalloff = 0.9, ShotSound = "HeavyShot", ShotPitch = 1.25,
+		BoxWeight = 16,
+		View = { Length = 1.1, Barrel = 0.6, Color = Color3.fromRGB(70, 74, 86), Accent = Color3.fromRGB(120, 230, 160), Stock = false, MagHeight = 0.2 },
+	},
+	Launcher = {
+		Id = "Launcher", DisplayName = "Hanabi Launcher", Class = "Special", FireMode = "Semi",
+		Damage = 60, HeadshotMultiplier = 1, RPM = 70, MagSize = 4, ReserveAmmo = 24, ReloadTime = 2.8,
+		Range = 300, HipSpread = 0.6, AdsSpread = 0.3, RecoilKick = 3.5, RecoilSide = 0.4, AdsFov = 62,
+		Pellets = 1, Pierce = 0, ShotSound = "ShotgunShot", ShotPitch = 0.7,
+		TracerColor = Color3.fromRGB(255, 120, 200),
+		BoxWeight = 10,
+		-- explosive shells: burst where they land
+		Effects = { Explosive = { Radius = 11, Damage = 280, Color = Color3.fromRGB(255, 110, 190) } },
+		View = { Length = 1.6, Barrel = 0.9, Color = Color3.fromRGB(60, 40, 60), Accent = Color3.fromRGB(255, 110, 190), Stock = true, MagHeight = 0.35 },
+	},
+	BurstRifle = {
+		Id = "BurstRifle", DisplayName = "Tengu Burst Rifle", Class = "AssaultRifle", FireMode = "Burst", BurstCount = 3,
+		Damage = 58, HeadshotMultiplier = 2.4, RPM = 780, MagSize = 24, ReserveAmmo = 192, ReloadTime = 2.0,
+		Range = 650, HipSpread = 1.3, AdsSpread = 0.15, RecoilKick = 0.7, RecoilSide = 0.2, AdsFov = 52,
+		Pellets = 1, Pierce = 0, ShotSound = "RifleShot", ShotPitch = 0.95,
+		BoxWeight = 16,
+		View = { Length = 1.9, Barrel = 0.9, Color = Color3.fromRGB(46, 50, 58), Accent = Color3.fromRGB(255, 200, 80), Stock = true, MagHeight = 0.55 },
 	},
 }
 
@@ -150,7 +182,7 @@ local Signature: { [string]: { [string]: any } } = {
 	Shotgun = {
 		Name = "Oni's Breath",
 		Pellets = 10, Tracer = Color3.fromRGB(255, 90, 40),
-		Effects = { Burn = { Dps = 60, Duration = 3 } },
+		Effects = { Burn = { Dps = 140, Duration = 3 } }, -- (was 60: too weak)
 	},
 	AssaultRifle = {
 		Name = "Raijin Thunderhead",
@@ -160,7 +192,22 @@ local Signature: { [string]: { [string]: any } } = {
 	Sniper = {
 		Name = "Moonlance",
 		Pierce = 99, Tracer = Color3.fromRGB(200, 170, 255),
-		Effects = { Explosive = { Radius = 12, Damage = 600, HeadshotOnly = true, Color = Color3.fromRGB(200, 160, 255) } },
+		Effects = { Explosive = { Radius = 12, Damage = 900, HeadshotOnly = true, Color = Color3.fromRGB(200, 160, 255) } }, -- (was 600)
+	},
+	Magnum = {
+		Name = "Thunder Magnum",
+		Pierce = 3, Tracer = Color3.fromRGB(140, 255, 190),
+		Effects = { Chain = { Count = 3, Range = 18, Mult = 0.7 } },
+	},
+	Launcher = {
+		Name = "Grand Finale",
+		MagSize = 6, Tracer = Color3.fromRGB(255, 160, 230),
+		Effects = { Explosive = { Radius = 15, Damage = 420, Color = Color3.fromRGB(255, 150, 230) }, Burn = { Dps = 80, Duration = 3 } },
+	},
+	BurstRifle = {
+		Name = "Tengu Gale",
+		Pierce = 2, Tracer = Color3.fromRGB(255, 220, 120),
+		Effects = { Shock = { Slow = 0.5, Time = 1.2 } },
 	},
 	LMG = {
 		Name = "Kaiju Inferno",

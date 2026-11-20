@@ -127,7 +127,14 @@ function PlayerService.Revive(player: Player, by: Player?)
 	PlayerService.PlayerRevived:Fire(player, by)
 end
 
--- Standing AND not downed: downed players can't shoot and zombies ignore them.
+-- Alive or downed (last stand): downed players can still shoot, with limited ammo.
+function PlayerService.CanShoot(player: Player): boolean
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	return hum ~= nil and hum.Health > 0 and char:FindFirstChild("HumanoidRootPart") ~= nil
+end
+
+-- Standing AND not downed: zombies ignore downed players; no knife/abilities while down.
 function PlayerService.IsAlive(player: Player): boolean
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")

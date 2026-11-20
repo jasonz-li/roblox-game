@@ -80,6 +80,22 @@ function DevService.Start()
 				end
 			end
 			return "opened " .. n
+		elseif cmd == "raid" then
+			-- jump straight into the Titan encounter (testing). `a` = power multiplier.
+			local BossService = require(script.Parent.BossService)
+			task.spawn(BossService.Run, 10, tonumber(a) or 1, function()
+				return false
+			end)
+			return "raid started"
+		elseif cmd == "bosshp" then
+			-- set the Titan's health fraction (testing phase changes), e.g. 0.6
+			for _, m in game:GetService("CollectionService"):GetTagged("Enemy") do
+				if m:GetAttribute("Boss") then
+					local h = m:FindFirstChildOfClass("Humanoid")
+					h.Health = h.MaxHealth * (tonumber(a) or 1)
+				end
+			end
+			return "boss hp set"
 		elseif cmd == "killall" then
 			EnemyService.KillAll(true)
 			return "killed all"

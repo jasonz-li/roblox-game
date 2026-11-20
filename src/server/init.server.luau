@@ -18,6 +18,7 @@ local ORDER = {
 	"ProgressionService",
 	"AbilityService",
 	"InteractionService",
+	"BossService",
 	"WaveService",
 	"DevService", -- Studio-only test hook (does nothing in live servers)
 }

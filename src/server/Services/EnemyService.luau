@@ -321,6 +321,59 @@ function EnemyService.SpawnBoss(wave: number, playerCount: number, pos: Vector3,
 	return enemies[model]
 end
 
+-- Ember Totem (raid phase 2): a stationary, shootable pillar with health. AI ignores it.
+function EnemyService.SpawnTotem(pos: Vector3, health: number)
+	local model = Instance.new("Model")
+	model.Name = "Ember Totem"
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(3.2, 10, 3.2)
+	root.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+	root.Anchored = true
+	root.Color = Color3.fromRGB(90, 40, 30)
+	root.Material = Enum.Material.Basalt
+	root.Parent = model
+	model.PrimaryPart = root
+	local core = Instance.new("Part")
+	core.Name = "Torso"
+	core.Shape = Enum.PartType.Ball
+	core.Size = Vector3.one * 3.4
+	core.CFrame = root.CFrame * CFrame.new(0, 6.2, 0)
+	core.Color = Color3.fromRGB(255, 120, 30)
+	core.Material = Enum.Material.Neon
+	core.Anchored = true
+	core.Parent = model
+	local glow = Instance.new("PointLight")
+	glow.Color = Color3.fromRGB(255, 120, 40)
+	glow.Range = 18
+	glow.Brightness = 2
+	glow.Parent = core
+	local hum = Instance.new("Humanoid")
+	hum.MaxHealth = health
+	hum.Health = health
+	hum.WalkSpeed = 0
+	hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	hum.Parent = model
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CollisionGroup = "Enemies"
+		end
+	end
+	model.Parent = enemiesFolder
+	CollectionService:AddTag(model, "Enemy")
+	model:SetAttribute("Totem", true)
+	local data = {
+		busyUntil = math.huge, model = model, humanoid = hum, root = root, isTotem = true,
+		stats = { AttackRange = 0, AttackCooldown = 99, RunSpeed = 0, WalkSpeed = 0 },
+		damage = 0, dead = false, lastAttack = 0, nextGroan = math.huge, baseSpeed = 0,
+		lastPos = root.Position, stuckTime = 0, lastTear = 0,
+	}
+	enemies[model] = data
+	aliveCount += 1
+	return data
+end
+
 function EnemyService.Spawn(enemyId: string, wave: number, opts)
 	local stats = EnemyConfig.Enemies[enemyId]
 	assert(stats, "Unknown enemy " .. tostring(enemyId))

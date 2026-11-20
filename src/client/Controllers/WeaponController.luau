@@ -31,6 +31,7 @@ local mag, reserve = stats.MagSize, stats.ReserveAmmo
 local reloading, reloadStartedAt, reloadDuration = false, 0, 1
 local switchUntil, switchStartedAt = 0, 0
 local triggerHeld, adsHeld, sprintHeld = false, false, false
+local burstLeft = 0 -- rounds left in the current burst (FireMode "Burst")
 local nextShotAt, lastShotAt = 0, 0
 local adsAlpha, sprintAlpha = 0, 0
 local kickBack, kickPitch = 0, 0
@@ -319,7 +320,7 @@ local function trySwitch(slot: number)
 end
 
 local function fire(hum, char)
-	if reloading or os.clock() < switchUntil or player:GetAttribute("Downed") then
+	if reloading or os.clock() < switchUntil then -- (downed players can shoot: last stand)
 		return
 	end
 	if mag <= 0 then
@@ -495,6 +496,11 @@ local function update(dt)
 		fire(hum, char)
 		if stats.FireMode == "Semi" then
 			triggerHeld = false
+		elseif stats.FireMode == "Burst" then
+			burstLeft -= 1
+			if burstLeft <= 0 then
+				triggerHeld = false
+			end
 		end
 	end
 
@@ -585,6 +591,7 @@ function WeaponController.Start()
 		end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			triggerHeld = true
+			burstLeft = stats.BurstCount or 3 -- (only used by FireMode "Burst")
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
 			adsHeld = true
 		elseif input.KeyCode == Enum.KeyCode.R then
@@ -603,7 +610,9 @@ function WeaponController.Start()
 	end)
 	UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			triggerHeld = false
+			if stats.FireMode ~= "Burst" then -- a burst always finishes its rounds
+				triggerHeld = false
+			end
 		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
 			adsHeld = false
 		elseif input.KeyCode == Enum.KeyCode.LeftShift then

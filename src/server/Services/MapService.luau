@@ -104,6 +104,8 @@ local function lantern(pos: Vector3)
 	light.Parent = lamp
 end
 
+local clipProps -- defined below (after clip)
+
 -- Invisible player-only blocker (see setupCollisionGroups).
 local function clip(name: string, min: Vector3, max: Vector3, parent: Instance?)
 	if max.Y - min.Y <= 0 then
@@ -123,6 +125,50 @@ local function clip(name: string, min: Vector3, max: Vector3, parent: Instance?)
 		p.Parent = parent
 	end
 	return p
+end
+
+-- No safe perches: every solid prop you could hop onto (cars, bus, dumpsters,
+-- crates, containers, counters, machines...) gets a player-only blocker on top,
+-- so you can't stand where zombies can't reach. Ramps/stairs/floors are skipped.
+local WALKABLE = { "Ramp", "Stairs", "Floor", "Ground", "Balcony", "Porch", "Sidewalk", "Landing", "Catwalk", "FootPad", "Pad", "Rim", "Lane", "Road", "Apron", "Lot", "Overlay" }
+local FLOORS = { 0, -20, -150 }
+local function isWalkable(name: string): boolean
+	for _, w in WALKABLE do
+		if string.find(name, w, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+function clipProps()
+	local n = 0
+	for _, p in mapFolder:GetDescendants() do
+		if p:IsA("BasePart") and p.CanCollide and p.Transparency < 1 and p.CollisionGroup ~= "PlayerClip" and not isWalkable(p.Name) then
+			-- world-space bounding box (handles rotated cars)
+			local cf, s = p.CFrame, p.Size / 2
+			local ext = Vector3.new(
+				math.abs(cf.RightVector.X) * s.X + math.abs(cf.UpVector.X) * s.Y + math.abs(cf.LookVector.X) * s.Z,
+				math.abs(cf.RightVector.Y) * s.X + math.abs(cf.UpVector.Y) * s.Y + math.abs(cf.LookVector.Y) * s.Z,
+				math.abs(cf.RightVector.Z) * s.X + math.abs(cf.UpVector.Z) * s.Y + math.abs(cf.LookVector.Z) * s.Z
+			)
+			local lo, hi = p.Position - ext, p.Position + ext
+			local height = hi.Y - lo.Y
+			local footprint = (hi.X - lo.X) * (hi.Z - lo.Z)
+			local onFloor = false
+			for _, f in FLOORS do
+				if lo.Y >= f - 1.5 and lo.Y <= f + 2 then
+					onFloor = true
+				end
+			end
+			-- something you could climb onto: 2..14 tall, sitting on a floor, not huge
+			if onFloor and height >= 2 and height <= 14 and footprint <= 450 then
+				clip("PropClip", Vector3.new(lo.X, hi.Y, lo.Z), Vector3.new(hi.X, hi.Y + 40, hi.Z), mapFolder)
+				n += 1
+			end
+		end
+	end
+	return n
 end
 
 local function buildWalls()
@@ -750,6 +796,7 @@ local function build()
 	buildForge()
 	buildMarkers()
 	buildBossArena()
+	clipProps()
 	mapFolder.Parent = workspace
 	-- Maps that bring their own ground (with holes for basements) remove the Rojo baseplate at runtime.
 	if Layout.OwnGround then

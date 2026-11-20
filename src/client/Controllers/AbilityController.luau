@@ -314,6 +314,167 @@ function FX.AbsoluteZeroPulse(d)
 	SoundController.PlayAt("ShotgunShot", d.pos, 80, 0.4)
 end
 
+----------------------------------------------------------------------
+-- The Titan raid (BossService)
+----------------------------------------------------------------------
+
+local raidUi = {}
+
+local function callout(text: string, sub: string?, color: Color3?)
+	local t = raidUi.callout
+	t.Text = text
+	t.TextColor3 = color or Color3.fromRGB(255, 150, 60)
+	raidUi.calloutSub.Text = sub or ""
+	for _, l in { t, raidUi.calloutSub } do
+		l.TextTransparency = 0
+		l.TextStrokeTransparency = 0.4
+		TweenService:Create(l, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 2.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	end
+end
+
+function FX.BossIntro(_d)
+	local f = raidUi.fade
+	f.BackgroundTransparency = 1
+	TweenService:Create(f, TweenInfo.new(0.6), { BackgroundTransparency = 0 }):Play()
+	CameraController.Shake(2)
+	SoundController.Play("Nuke", 0.6, 0.6)
+	task.delay(2.4, function()
+		callout("THE HOLLOW", "The Dust Titan awaits. Work together.", Color3.fromRGB(255, 120, 40))
+		TweenService:Create(f, TweenInfo.new(1.0), { BackgroundTransparency = 1 }):Play()
+	end)
+end
+
+function FX.BossCallout(d)
+	callout(d.text, d.sub)
+	SoundController.Play("WaveStart", 0.7, 0.8)
+end
+
+function FX.BossRing(d)
+	local map = workspace:FindFirstChild("Map")
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = map and { map } or {}
+	local balls = {}
+	for _, dir in d.dirs do
+		local b = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 2.4, Position = d.origin, Color = Color3.fromRGB(255, 120, 30), Transparency = 0 })
+		table.insert(balls, { part = b, pos = d.origin, vel = dir * d.speed, alive = true })
+	end
+	local t0 = os.clock()
+	local conn
+	conn = RunService.Heartbeat:Connect(function(dt)
+		if os.clock() - t0 > d.life then
+			conn:Disconnect()
+			for _, b in balls do
+				b.part:Destroy()
+			end
+			return
+		end
+		for _, b in balls do
+			if b.alive then
+				local nextPos = b.pos + b.vel * dt
+				if workspace:Raycast(b.pos, nextPos - b.pos, params) then
+					b.alive = false
+					fadeAndDie(b.part, 0.15, { Size = Vector3.one * 5 })
+				else
+					b.pos = nextPos
+					b.part.Position = nextPos
+				end
+			end
+		end
+	end)
+	SoundController.PlayAt("ShotgunShot", d.origin, 160, 0.5)
+end
+
+function FX.BossMark(d)
+	local target = d.target
+	local r = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+	if not r then
+		return
+	end
+	local brand = d.mark == "Brand"
+	local color = brand and Color3.fromRGB(255, 130, 40) or Color3.fromRGB(190, 90, 255)
+	local disc = fxPart({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.25, d.radius * 2, d.radius * 2), Color = color, Transparency = 0.55 })
+	local inner = fxPart({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 0.5, 0.5), Color = color, Transparency = 0.2 })
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromOffset(200, 40)
+	gui.StudsOffset = Vector3.new(0, 5, 0)
+	gui.AlwaysOnTop = true
+	gui.Adornee = r
+	gui.Parent = disc
+	local lbl = label({ Text = brand and "STACK HERE" or "SPREAD OUT", TextSize = 20, TextColor3 = color, Size = UDim2.fromScale(1, 1), Parent = gui })
+	if target == player then
+		lbl.Text = brand and "YOU'RE BRANDED: STACK WITH ALLIES" or "MARKED: GET AWAY FROM ALLIES"
+		SoundController.Play("Denied", 0.8, 0.7)
+	end
+	local t0 = os.clock()
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local a = (os.clock() - t0) / d.delay
+		if a >= 1 or not r.Parent then
+			conn:Disconnect()
+			disc:Destroy()
+			inner:Destroy()
+			return
+		end
+		local floor = r.Position - Vector3.new(0, 2.9, 0)
+		local cf = CFrame.new(floor) * CFrame.Angles(0, 0, math.rad(90))
+		disc.CFrame = cf
+		local s = d.radius * 2 * a
+		inner.Size = Vector3.new(0.3, s, s)
+		inner.CFrame = cf
+	end)
+end
+
+function FX.BossBoom(d)
+	local boom = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 3, Position = d.pos, Color = d.color or Color3.fromRGB(255, 120, 40), Transparency = 0.1 })
+	fadeAndDie(boom, 0.5, { Size = Vector3.one * d.radius * 2 })
+	ring(d.pos - Vector3.new(0, 2.5, 0), d.radius, d.color or Color3.fromRGB(255, 120, 40), 0.5, 0.3)
+	SoundController.PlayAt("Nuke", d.pos, 180, 1.1)
+	local cam = workspace.CurrentCamera
+	if cam and (cam.CFrame.Position - d.pos).Magnitude < d.radius + 4 then
+		ImpactController.Play("medium")
+	end
+end
+
+local function buildRaidUi()
+	raidUi.fade = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 50, Parent = gui })
+	raidUi.callout = label({ Text = "", TextSize = 52, TextTransparency = 1, TextStrokeTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.24), Size = UDim2.fromOffset(900, 60), ZIndex = 51, Parent = gui })
+	raidUi.calloutSub = label({ Text = "", Font = Enum.Font.GothamBold, TextSize = 20, TextTransparency = 1, TextStrokeTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.24, 40), Size = UDim2.fromOffset(900, 26), ZIndex = 51, Parent = gui })
+	-- core-break bar (Cataclysm channel)
+	raidUi.core = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 132), Size = UDim2.fromOffset(360, 30), BackgroundTransparency = 1, Visible = false, Parent = gui })
+	label({ Text = "BREAK THE CORE", TextSize = 16, TextColor3 = Color3.fromRGB(255, 220, 120), Size = UDim2.new(1, 0, 0, 16), Parent = raidUi.core })
+	local bg = new("Frame", { Position = UDim2.fromOffset(0, 18), Size = UDim2.new(1, 0, 0, 10), BackgroundColor3 = Color3.fromRGB(40, 24, 20), BorderSizePixel = 0, Parent = raidUi.core }, { new("UICorner", { CornerRadius = UDim.new(0, 4) }) })
+	raidUi.coreFill = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Color3.fromRGB(255, 220, 120), BorderSizePixel = 0, Parent = bg }, { new("UICorner", { CornerRadius = UDim.new(0, 4) }) })
+end
+
+local lavaRing
+local function updateRaid()
+	local gs = Remotes.GameState()
+	local now = workspace:GetServerTimeNow()
+	-- core bar
+	local coreUntil = gs:GetAttribute("CoreUntil") or 0
+	raidUi.core.Visible = coreUntil > now
+	if raidUi.core.Visible then
+		local th = math.max(1, gs:GetAttribute("CoreThreshold") or 1)
+		raidUi.coreFill.Size = UDim2.fromScale(math.clamp((gs:GetAttribute("CoreDamage") or 0) / th, 0, 1), 1)
+	end
+	-- lava edge ring (phase 3)
+	local radius = gs:GetAttribute("LavaRadius") or 0
+	local center = gs:GetAttribute("HollowCenter")
+	local phase = gs:GetAttribute("BossPhase") or 0
+	if phase >= 3 and radius > 0 and typeof(center) == "Vector3" then
+		if not lavaRing then
+			lavaRing = fxPart({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 2, 2), Color = Color3.fromRGB(255, 60, 20), Transparency = 0.35 })
+		end
+		lavaRing.Size = Vector3.new(0.4, radius * 2, radius * 2)
+		lavaRing.CFrame = CFrame.new(center + Vector3.new(0, 0.2, 0)) * CFrame.Angles(0, 0, math.rad(90))
+		lavaRing.Material = Enum.Material.ForceField
+	elseif lavaRing then
+		lavaRing:Destroy()
+		lavaRing = nil
+	end
+end
+
 -- Kaida (tank)
 function FX.WarCry(d)
 	ring(d.pos, d.radius, Color3.fromRGB(255, 170, 70), 0.7, 0.4)
@@ -543,8 +704,8 @@ local function use(slotName: string)
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local cam = workspace.CurrentCamera
-	if not hum or hum.Health <= 0 or not cam then
-		return
+	if not hum or hum.Health <= 0 or not cam or player:GetAttribute("Downed") then
+		return -- no abilities while downed (the dash used to run client-side anyway)
 	end
 	local h = hero()
 	local aim = cam.CFrame.LookVector
@@ -648,6 +809,7 @@ function AbilityController.Init()
 	gui = new("ScreenGui", { Name = "Abilities", ResetOnSpawn = false, IgnoreGuiInset = true, Parent = player:WaitForChild("PlayerGui") })
 	buildHud()
 	buildDownedUi()
+	buildRaidUi()
 end
 
 function AbilityController.Start()
@@ -699,6 +861,7 @@ function AbilityController.Start()
 
 	RunService.RenderStepped:Connect(updateHud)
 	RunService.RenderStepped:Connect(updateDowned)
+	RunService.RenderStepped:Connect(updateRaid)
 	Players.PlayerRemoving:Connect(function(p)
 		if markers[p] then
 			markers[p]:Destroy()

@@ -18,6 +18,7 @@ local PowerUpService = require(script.Parent.PowerUpService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local DataService = require(script.Parent.DataService)
 local AbilityService = require(script.Parent.AbilityService)
+local BossService = require(script.Parent.BossService)
 local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 
 local WaveService = {}
@@ -92,18 +93,17 @@ local function runWave()
 	})
 
 	if isBossWave then
-		-- The Titan rises in the Main Street arena (or near you if that's still locked)
-		local layout = MapService.GetLayout()
-		local pos
-		if MapService.IsZoneUnlocked(1) and layout.BossArena then
-			local spots = layout.BossArena.BossSpawns
-			pos = spots[math.random(1, #spots)]
-		else
-			local info = MapService.GetEnemySpawn(true)
-			pos = info and info.pos or layout.PlayerSpawn
+		-- The raid: the party drops into the Hollow and fights the Titan (BossService).
+		-- No zombie escort; the fight is the mechanics.
+		totalThisWave = 1
+		updateRemaining()
+		BossService.Run(wave, partyPower(), function()
+			return gameOver
+		end)
+		while EnemyService.AliveCount() > 0 and not gameOver do
+			task.wait(0.25)
 		end
-		task.wait(1.5)
-		EnemyService.SpawnBoss(wave, #Players:GetPlayers(), pos, partyPower())
+		return
 	end
 
 	local spawned = 0
@@ -152,6 +152,7 @@ local function resetMatch()
 	PowerUpService.Reset()
 	ProgressionService.Reset()
 	AbilityService.Reset()
+	BossService.Reset()
 	CurrencyService.ResetAll()
 	wave = 0
 	gameOver = false
@@ -237,7 +238,7 @@ function WaveService.Start()
 				CurrencyService.Add(p, EnemyConfig.Boss.Points, EnemyConfig.Boss.DisplayName .. " slain")
 			end
 			notify:FireAllClients("AbilityFx", { kind = "BossDown", pos = data.root.Position })
-			notify:FireAllClients("Message", { text = "The Titan has fallen. Finish the horde!", tone = "good" })
+			notify:FireAllClients("Message", { text = "The Titan has fallen!", tone = "good" })
 		end
 	end)
 	PlayerService.AllPlayersDead:Connect(function()

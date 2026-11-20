@@ -71,7 +71,8 @@ local function sync(player)
 	player:SetAttribute("WeaponUpgraded", w.upgraded)
 	player:SetAttribute("WeaponLevel", w.level)
 	player:SetAttribute("Ammo", w.mag)
-	player:SetAttribute("Reserve", w.reserve)
+	-- while downed, the HUD shows the last-stand spare magazine as your reserve
+	player:SetAttribute("Reserve", player:GetAttribute("Downed") and (w.lastStand or 0) or w.reserve)
 	player:SetAttribute("Reloading", w.reloading)
 	player:SetAttribute("CurrentSlot", inv.current)
 	for i = 1, WeaponConfig.MaxSlots do
@@ -194,6 +195,15 @@ local function traceBullet(origin, direction, range, pierce, claimedPart)
 			table.insert(hits, { enemy = enemy, part = claimedPart, index = 0, pos = pos })
 			endPos = pos
 		end
+	elseif hits[1] and claimedPart and claimedPart.Name == "Head" and hits[1].part.Name ~= "Head" then
+		-- The client sees zombies a few frames behind the server, so a head you clearly
+		-- hit can land on the server's body. If the claimed head belongs to the same
+		-- zombie and passes the usual line/wall checks, count it as a headshot.
+		local enemy, pos = claimIsValid(origin, direction, range, claimedPart)
+		if enemy and enemy == hits[1].enemy then
+			hits[1].part = claimedPart
+			hits[1].pos = pos
+		end
 	end
 	return hits, endPos
 end
@@ -309,7 +319,7 @@ local function onFire(player: Player, origin, directions, claims)
 		claims = {}
 	end
 
-	if not PlayerService.IsAlive(player) then
+	if not PlayerService.CanShoot(player) then -- (downed players can shoot: last stand)
 		return
 	end
 	local head = player.Character:FindFirstChild("Head")
@@ -497,10 +507,13 @@ end
 
 local function onReload(player: Player)
 	local w, inv = current(player)
-	if not w or w.reloading or not PlayerService.IsAlive(player) or os.clock() < inv.switchUntil then
+	if not w or w.reloading or not PlayerService.CanShoot(player) or os.clock() < inv.switchUntil then
 		return
 	end
-	if w.mag >= w.stats.MagSize or w.reserve <= 0 then
+	-- Last stand: while downed, reloads draw from one spare magazine, not your reserve
+	local downed = player:GetAttribute("Downed") == true
+	local pool = downed and (w.lastStand or 0) or w.reserve
+	if w.mag >= w.stats.MagSize or pool <= 0 then
 		return
 	end
 	w.reloading = true
@@ -529,10 +542,16 @@ local function onReload(player: Player)
 		if not inv2 or inv2.generation ~= generation or w.reloadToken ~= token or not w.reloading then
 			return
 		end
-		if PlayerService.IsAlive(player) then
-			local take = math.min(w.stats.MagSize - w.mag, w.reserve)
-			w.mag += take
-			w.reserve -= take
+		if PlayerService.CanShoot(player) then
+			if player:GetAttribute("Downed") then
+				local take = math.min(w.stats.MagSize - w.mag, w.lastStand or 0)
+				w.mag += take
+				w.lastStand = (w.lastStand or 0) - take
+			else
+				local take = math.min(w.stats.MagSize - w.mag, w.reserve)
+				w.mag += take
+				w.reserve -= take
+			end
 		end
 		w.reloading = false
 		sync(player)
@@ -665,6 +684,23 @@ function WeaponService.Start()
 
 	-- Fresh loadout (starting pistol) every time a character spawns.
 	PlayerService.CharacterSpawned:Connect(resetInventory)
+
+	-- Last stand: going down gives the gun in hand one spare magazine to fight with
+	PlayerService.PlayerDowned:Connect(function(player)
+		local w = current(player)
+		if w then
+			cancelReload(w)
+			w.lastStand = w.stats.MagSize
+			sync(player)
+		end
+	end)
+	PlayerService.PlayerRevived:Connect(function(player)
+		local w = current(player)
+		if w then
+			w.lastStand = nil
+			sync(player)
+		end
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		inventories[player] = nil
 		lastMelee[player] = nil
