@@ -434,6 +434,23 @@ function AbilityController.Start()
 	useRemote = Remotes.Get("UseAbility")
 	selectRemote = Remotes.Get("SelectHero")
 
+	-- Window repair: hold E anywhere near a damaged window. The server repairs the
+	-- nearest one by position, so you can turn around and shoot while holding.
+	local repairRemote = Remotes.Get("RepairHold")
+	local repairHeld = false
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if input.KeyCode == Enum.KeyCode.E and not repairHeld and not UserInputService:GetFocusedTextBox() then
+			repairHeld = true
+			repairRemote:FireServer(true)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.E and repairHeld then
+			repairHeld = false
+			repairRemote:FireServer(false)
+		end
+	end)
+
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then
 			return

@@ -42,7 +42,7 @@ local function refreshPrompt(barrier: BasePart)
 	end
 	local boards, max = barrier:GetAttribute("Boards"), barrier:GetAttribute("MaxBoards")
 	prompt.Enabled = boards < max
-	prompt.ActionText = "Hold to repair"
+	prompt.ActionText = "Hold E to repair (you can turn and shoot)"
 	prompt.ObjectText = string.format("%d / %d boards", boards, max)
 end
 
@@ -107,38 +107,52 @@ function BarrierService.Repair(player: Player, barrier: BasePart)
 	end
 end
 
--- Hold-to-repair: while a player holds E on the prompt, rebuild one board every
--- RepairInterval until they let go, walk away, go down, or the window is full.
+-- Hold-to-repair, position based: while the player HOLDS E (RepairHold remote), the
+-- server rebuilds one board every RepairInterval on the nearest damaged window within
+-- REPAIR_RANGE of them. Where they look doesn't matter: you can turn around and shoot
+-- while repairing. (The old ProximityPrompt hold cancelled when you looked away.)
+local REPAIR_RANGE = 9
 local repairing = {} -- [Player] = token
-local function canKeepRepairing(player: Player, barrier: BasePart, prompt: ProximityPrompt): boolean
-	if not barrier.Parent or not player.Parent then
-		return false
-	end
+
+local function nearestDamaged(player: Player): BasePart?
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local root = char and char:FindFirstChild("HumanoidRootPart")
 	if not hum or hum.Health <= 0 or not root then
-		return false
+		return nil
 	end
-	if (root.Position - barrier.Position).Magnitude > prompt.MaxActivationDistance + 4 then
-		return false
+	local best, bestD = nil, REPAIR_RANGE
+	for _, b in CollectionService:GetTagged("Barrier") do
+		if b.Parent and (b:GetAttribute("Boards") or 0) < (b:GetAttribute("MaxBoards") or 0) then
+			local d = Vector3.new(root.Position.X - b.Position.X, (root.Position.Y - b.Position.Y) * 0.5, root.Position.Z - b.Position.Z).Magnitude
+			if d <= bestD then
+				best, bestD = b, d
+			end
+		end
 	end
-	return (barrier:GetAttribute("Boards") or 0) < (barrier:GetAttribute("MaxBoards") or 0)
+	return best
 end
 
-local function startRepair(player: Player, barrier: BasePart, prompt: ProximityPrompt)
+local function setHolding(player: Player, holding: boolean)
+	if not holding then
+		repairing[player] = nil
+		return
+	end
+	if repairing[player] then
+		return
+	end
 	local token = {}
 	repairing[player] = token
 	task.spawn(function()
-		while repairing[player] == token do
+		while repairing[player] == token and player.Parent do
 			task.wait(cfg.RepairInterval)
-			if repairing[player] ~= token or not canKeepRepairing(player, barrier, prompt) then
+			if repairing[player] ~= token then
 				break
 			end
-			BarrierService.Repair(player, barrier)
-		end
-		if repairing[player] == token then
-			repairing[player] = nil
+			local barrier = nearestDamaged(player)
+			if barrier then
+				BarrierService.Repair(player, barrier)
+			end
 		end
 	end)
 end
@@ -155,19 +169,13 @@ local function setup(barrier: BasePart)
 		if not prompt then
 			return
 		end
-		prompt.KeyboardKeyCode = Enum.KeyCode.E
-		prompt.MaxActivationDistance = 7
-		-- The fill ring roughly matches a full repair from empty; the actual repairs are
-		-- driven by the hold loop below (Triggered does nothing for barriers).
-		prompt.HoldDuration = cfg.Boards * cfg.RepairInterval
-		prompt.PromptButtonHoldBegan:Connect(function(player)
-			if canKeepRepairing(player, barrier, prompt) then
-				startRepair(player, barrier, prompt)
-			end
-		end)
-		prompt.PromptButtonHoldEnded:Connect(function(player)
-			repairing[player] = nil
-		end)
+		-- The prompt is only a label now ("Hold E"): repairs come from the RepairHold
+		-- remote, so the prompt itself must not grab the E key.
+		prompt.KeyboardKeyCode = Enum.KeyCode.Unknown
+		prompt.GamepadKeyCode = Enum.KeyCode.Unknown
+		prompt.ClickablePrompt = false
+		prompt.HoldDuration = 0
+		prompt.MaxActivationDistance = REPAIR_RANGE
 		refreshPrompt(barrier)
 	end)
 end
@@ -177,6 +185,10 @@ function BarrierService.Init()
 end
 
 function BarrierService.Start()
+	local RemoteGuard = require(script.Parent.Parent.Util.RemoteGuard)
+	RemoteGuard.Connect(Remotes.Get("RepairHold"), { rate = 8, burst = 6 }, function(player, holding)
+		setHolding(player, holding == true)
+	end)
 	CollectionService:GetInstanceAddedSignal("Barrier"):Connect(setup)
 	for _, b in CollectionService:GetTagged("Barrier") do
 		setup(b)
