@@ -157,6 +157,48 @@ end
 -- Spawning / lookup
 ----------------------------------------------------------------------
 
+-- Claw up out of the ground at finalCf: start below, rise, then hand over to physics.
+-- Used for ground spawns and for relocating lost zombies. Returns busy-until time.
+local function emergeAt(model: Model, finalCf: CFrame, scale: number): number
+	local root = model.PrimaryPart
+	root.Anchored = true
+	-- PivotTo moves every part. Setting only root.CFrame before parenting left the
+	-- welded torso/head 6 studs above the root: those were the floating zombies.
+	model:PivotTo(finalCf - Vector3.new(0, 6 * scale, 0))
+	model.Parent = enemiesFolder
+	TweenService:Create(root, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = finalCf }):Play()
+	task.delay(1.15, function()
+		if root.Parent then
+			root.Anchored = false
+			pcall(function()
+				root:SetNetworkOwner(nil)
+			end)
+		end
+	end)
+	-- dirt burst
+	local burst = Instance.new("Part")
+	burst.Anchored, burst.CanCollide, burst.CanQuery, burst.CanTouch = true, false, false, false
+	burst.Transparency = 1
+	burst.Position = finalCf.Position - Vector3.new(0, (HIP_HEIGHT + 1) * scale, 0)
+	burst.Name = "SpawnDirt"
+	burst.Parent = workspace -- NOT the Enemies folder: everything in there must be an enemy Model
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	e.Color = ColorSequence.new(Color3.fromRGB(110, 90, 70))
+	e.Size = NumberSequence.new(1.5, 4)
+	e.Transparency = NumberSequence.new(0.3, 1)
+	e.Lifetime = NumberRange.new(0.8, 1.2)
+	e.Speed = NumberRange.new(6, 10)
+	e.SpreadAngle = Vector2.new(50, 50)
+	e.Rate = 0
+	e.Parent = burst
+	e:Emit(18)
+	task.delay(2, function()
+		burst:Destroy()
+	end)
+	return os.clock() + 1.15
+end
+
 -- Elite look: bigger, scorched red body, burning yellow eyes, ember aura.
 local function makeElite(model: Model, spawnPos: Vector3)
 	local e = ProgressionConfig.Elite
@@ -225,44 +267,7 @@ function EnemyService.Spawn(enemyId: string, wave: number, opts)
 	local root = model.PrimaryPart
 	local busyUntil = 0
 	if spawnInfo.emerge then
-		-- Claw up out of the ground: start below, rise, then hand over to physics.
-		local finalCf = root.CFrame
-		root.Anchored = true
-		-- PivotTo moves every part. Setting only root.CFrame before parenting left the
-		-- welded torso/head 6 studs above the root: those were the floating zombies.
-		model:PivotTo(finalCf - Vector3.new(0, 6, 0))
-		model.Parent = enemiesFolder
-		TweenService:Create(root, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = finalCf }):Play()
-		busyUntil = os.clock() + 1.15
-		task.delay(1.15, function()
-			if root.Parent then
-				root.Anchored = false
-				pcall(function()
-					root:SetNetworkOwner(nil)
-				end)
-			end
-		end)
-		-- dirt burst
-		local burst = Instance.new("Part")
-		burst.Anchored, burst.CanCollide, burst.CanQuery, burst.CanTouch = true, false, false, false
-		burst.Transparency = 1
-		burst.Position = finalCf.Position - Vector3.new(0, HIP_HEIGHT + 1, 0)
-		burst.Name = "SpawnDirt"
-		burst.Parent = workspace -- NOT the Enemies folder: everything in there must be an enemy Model
-		local e = Instance.new("ParticleEmitter")
-		e.Texture = "rbxasset://textures/particles/smoke_main.dds"
-		e.Color = ColorSequence.new(Color3.fromRGB(110, 90, 70))
-		e.Size = NumberSequence.new(1.5, 4)
-		e.Transparency = NumberSequence.new(0.3, 1)
-		e.Lifetime = NumberRange.new(0.8, 1.2)
-		e.Speed = NumberRange.new(6, 10)
-		e.SpreadAngle = Vector2.new(50, 50)
-		e.Rate = 0
-		e.Parent = burst
-		e:Emit(18)
-		task.delay(2, function()
-			burst:Destroy()
-		end)
+		busyUntil = emergeAt(model, root.CFrame, isElite and ProgressionConfig.Elite.Scale or 1)
 	else
 		model.Parent = enemiesFolder
 		root:SetNetworkOwner(nil) -- server-owned physics: no client control, no ownership jitter
@@ -546,6 +551,44 @@ local function playSound(data, name: string)
 	s:Play()
 end
 
+-- Hunt mode (set by WaveService when the last few zombies of a wave remain):
+-- they all run and get relocated sooner, so you never search for the last one.
+local hunting = false
+
+function EnemyService.SetHunting(on: boolean)
+	if on == hunting then
+		return
+	end
+	hunting = on
+	if on then
+		for _, data in enemies do
+			if not data.dead then
+				data.baseSpeed = math.max(data.baseSpeed, data.stats.RunSpeed)
+				data.humanoid.WalkSpeed = data.baseSpeed
+				data.isRunner = true
+				data.checkAt = nil
+			end
+		end
+	end
+end
+
+-- Move a lost/stuck zombie: it sinks away and claws up at a ground spawn near the players.
+local function relocate(data)
+	local info = MapService.GetEnemySpawn(true)
+	if not info or data.dead then
+		data.checkAt = nil
+		return
+	end
+	local scale = data.isElite and ProgressionConfig.Elite.Scale or 1
+	data.barrier = nil
+	data.waypoints = nil
+	data.checkAt = nil
+	data.stuckTime = 0
+	local finalCf = CFrame.new(info.pos + Vector3.new(0, (HIP_HEIGHT + 1) * scale, 0))
+	data.busyUntil = emergeAt(data.model, finalCf, scale)
+	data.lastPos = finalCf.Position
+end
+
 local function aiTick(dt: number)
 	local characters = PlayerService.GetAliveCharacters()
 	local pathBudget = EnemyConfig.PathBudgetPerTick
@@ -672,6 +715,20 @@ local function aiTick(dt: number)
 			if not followPath(data) then
 				hum:MoveTo(targetPos)
 			end
+		end
+
+		-- Lost or stuck: every few seconds, check the zombie actually got closer.
+		-- If not (and it's not already near you), it re-emerges from the ground near
+		-- the players, zombies-style. During the hunt (last few zombies) it's quicker.
+		local check = hunting and 4 or 8
+		if not data.checkAt then
+			data.checkAt, data.checkDist = now + check, dist
+		elseif now >= data.checkAt then
+			if dist > (hunting and 25 or 35) and dist > data.checkDist - 6 then
+				relocate(data)
+				continue
+			end
+			data.checkAt, data.checkDist = now + check, dist
 		end
 
 		-- Stuck detection: barely moved while it should be walking.

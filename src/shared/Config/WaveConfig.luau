@@ -37,6 +37,16 @@ function WaveConfig.RunnerChance(wave: number): number
 	return math.clamp(0.15 * (wave - 2), 0, 0.8)
 end
 
+-- How many of a wave's zombies may be alive at once. Keeping most of the wave
+-- queued means a Nuke clears the current group but never wins the round outright
+-- (zombies-style); the rest keep coming.
+function WaveConfig.AliveCap(total: number): number
+	return math.clamp(math.ceil(total * 0.4), 6, 24)
+end
+
+-- Last N zombies of a wave (nothing left to spawn) go into hunt mode.
+WaveConfig.HuntWhenRemaining = 3
+
 -- Seconds between spawns while below the alive cap.
 function WaveConfig.SpawnInterval(wave: number): number
 	return math.max(0.3, 1.2 - 0.08 * wave)

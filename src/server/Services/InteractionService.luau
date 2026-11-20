@@ -159,9 +159,10 @@ local function setPrompt(part: BasePart, action: string?, object: string?, enabl
 end
 
 local function onInteractable(part: Instance)
-	if not part:IsA("BasePart") or part:FindFirstChildOfClass("ProximityPrompt") then
+	if not part:IsA("BasePart") or part:GetAttribute("PromptsBuilt") then
 		return
 	end
+	part:SetAttribute("PromptsBuilt", true)
 	local kind = part:GetAttribute("Kind")
 	local action, object = promptTexts(part)
 
@@ -205,24 +206,25 @@ local function onInteractable(part: Instance)
 		return prompt
 	end
 
-	-- The main prompt lives on the part itself (other services find it there)...
-	makePrompt(part)
-	-- ...and wide doors get extra prompts every ~8 studs along their width, so you can
-	-- buy them from wherever you stand (only the nearest one shows).
 	if kind == "Door" then
+		-- Doors: prompts at chest height (4 studs up), one every ~8 studs along the width,
+		-- so you can buy from wherever you stand (only the nearest one shows). A prompt at
+		-- the part's center sat 14 studs up on tall doors: narrow gates had only that one
+		-- and couldn't be bought.
 		local width = math.max(part.Size.X, part.Size.Z)
 		local alongX = part.Size.X >= part.Size.Z
-		local count = math.floor(width / 8)
+		local count = math.max(1, math.floor(width / 8))
 		for i = 1, count do
 			local offset = -width / 2 + (i - 0.5) * (width / count)
-			if math.abs(offset) > 2 then -- the center already has the main prompt
-				local att = Instance.new("Attachment")
-				att.Name = "PromptPoint"
-				att.Position = Vector3.new(alongX and offset or 0, -part.Size.Y / 2 + 4, alongX and 0 or offset)
-				att.Parent = part
-				makePrompt(att)
-			end
+			local att = Instance.new("Attachment")
+			att.Name = "PromptPoint"
+			att.Position = Vector3.new(alongX and offset or 0, -part.Size.Y / 2 + 4, alongX and 0 or offset)
+			att.Parent = part
+			makePrompt(att)
 		end
+	else
+		-- Everything else keeps its prompt on the part (other services find it there).
+		makePrompt(part)
 	end
 end
 

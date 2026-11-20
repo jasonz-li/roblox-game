@@ -76,7 +76,7 @@ return {
 		{ Id = "D4", Label = "Motel gate", Cost = 1250, ZoneA = 1, ZoneB = 4, Center = V(170, 0, -14), Axis = "z", Width = 36, Material = "DiamondPlate", Color = Color3.fromRGB(80, 80, 85) },
 		{ Id = "D4b", Label = "Motel back gate", Cost = 1250, ZoneA = 1, ZoneB = 4, Center = V(170, 0, 61), Axis = "z", Width = 12, Material = "DiamondPlate", Color = Color3.fromRGB(80, 80, 85) },
 		{ Id = "D5", Label = "Storm drain", Cost = 1500, ZoneA = 4, ZoneB = 5, Center = V(256, 0, -8), Axis = "x", Width = 10, Height = 8, Material = "DiamondPlate", Color = Color3.fromRGB(70, 75, 80) },
-		{ Id = "D6", Label = "Sewer grate", Cost = 1500, ZoneA = 3, ZoneB = 5, Center = V(-20, -20, -94), Axis = "z", Width = 8, Height = 10, Material = "DiamondPlate", Color = Color3.fromRGB(70, 75, 80) },
+		{ Id = "D6", Label = "Sewer grate", Cost = 1500, ZoneA = 3, ZoneB = 5, Center = V(-20, -20, -94), Axis = "z", Width = 10, Height = 12, Material = "DiamondPlate", Color = Color3.fromRGB(70, 75, 80) },
 	},
 
 	WallBuys = {

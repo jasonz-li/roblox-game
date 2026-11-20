@@ -337,8 +337,8 @@ local function buildMarkers()
 			Size = Vector3.new(4, 0.2, 4),
 			Position = s.Pos + Vector3.new(0, 0.1, 0),
 			Color = Color3.fromRGB(200, 40, 60),
-			Material = Enum.Material.Neon,
-			Transparency = 0.7,
+			Material = Enum.Material.SmoothPlastic,
+			Transparency = 1, -- invisible: players shouldn't see where zombies come from
 			CanCollide = false,
 			CanQuery = false,
 			CanTouch = false,
@@ -786,13 +786,22 @@ function MapService.IsZoneUnlocked(zone: number): boolean
 	return unlocked[zone] == true
 end
 
-function MapService.OpenDoor(door: BasePart, opener: Player?)
+function MapService.OpenDoor(door: BasePart, opener: Player?, silent: boolean?)
 	if not door.Parent then
 		return
 	end
 	local a, b = door:GetAttribute("ZoneA"), door:GetAttribute("ZoneB")
 	unlocked[a] = true
 	unlocked[b] = true
+	-- Other doors between the same two zones are now pointless: open them for free.
+	for _, other in CollectionService:GetTagged("Interactable") do
+		if other ~= door and other:GetAttribute("Kind") == "Door" and other:IsDescendantOf(mapFolder) then
+			local oa, ob = other:GetAttribute("ZoneA"), other:GetAttribute("ZoneB")
+			if (oa == a and ob == b) or (oa == b and ob == a) then
+				task.defer(MapService.OpenDoor, other, nil, true)
+			end
+		end
+	end
 	CollectionService:RemoveTag(door, "Interactable")
 	door.CanCollide = false
 	door.CanQuery = false
@@ -805,6 +814,9 @@ function MapService.OpenDoor(door: BasePart, opener: Player?)
 	task.delay(0.9, function()
 		door:Destroy()
 	end)
+	if silent then
+		return
+	end
 	notify:FireAllClients("DoorOpened", {
 		by = opener and opener.DisplayName or nil,
 		zones = { Layout.Zones[a].Name, Layout.Zones[b].Name },
@@ -855,7 +867,7 @@ end
 
 -- Where the next zombie comes from: a boarded window (most of the time) or a ground spawn.
 -- Returns { pos: Vector3, barrier: BasePart? , emerge: boolean }
-function MapService.GetEnemySpawn()
+function MapService.GetEnemySpawn(groundOnly: boolean?)
 	local roots = playerRoots()
 	local barriers, grounds = {}, {}
 	for _, b in CollectionService:GetTagged("Barrier") do
@@ -868,7 +880,7 @@ function MapService.GetEnemySpawn()
 			table.insert(grounds, s)
 		end
 	end
-	local useBarrier = #barriers > 0 and (#grounds == 0 or math.random() < GameConfig.Barrier.BarrierSpawnChance)
+	local useBarrier = not groundOnly and #barriers > 0 and (#grounds == 0 or math.random() < GameConfig.Barrier.BarrierSpawnChance)
 	if useBarrier then
 		local b = pickNear(barriers, function(x)
 			return x:GetAttribute("Inside")

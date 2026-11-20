@@ -57,8 +57,10 @@ local function runWave()
 	local spawned = 0
 	local interval = WaveConfig.SpawnInterval(wave)
 	local eliteChance = ProgressionConfig.EliteChance(wave)
+	local cap = math.min(EnemyConfig.MaxAlive, WaveConfig.AliveCap(totalThisWave))
+	EnemyService.SetHunting(false)
 	while spawned < totalThisWave and not gameOver do
-		if EnemyService.AliveCount() < EnemyConfig.MaxAlive then
+		if EnemyService.AliveCount() < cap then
 			if EnemyService.Spawn("Shambler", wave, { elite = math.random() < eliteChance }) then
 				spawned += 1
 				task.wait(interval)
@@ -69,9 +71,14 @@ local function runWave()
 			task.wait(0.25)
 		end
 	end
+	-- Everything spawned: the last few zombies hunt you down instead of getting lost.
 	while EnemyService.AliveCount() > 0 and not gameOver do
+		if EnemyService.AliveCount() <= WaveConfig.HuntWhenRemaining then
+			EnemyService.SetHunting(true)
+		end
 		task.wait(0.25)
 	end
+	EnemyService.SetHunting(false)
 end
 
 local function waveReward()

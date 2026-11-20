@@ -76,6 +76,12 @@ end
 -- Decorative panel mounted on a wall face (fake doors/windows on non-enterable facades).
 -- axis "x": wall runs along X, face at z = face, sign = +1/-1 (which side the panel sticks out)
 local function panel(api, axis, face, sign, s0, s1, y0, y1, color, material, extra)
+	-- Decorative facings never collide: a trim strip once blocked the diner doorway
+	-- at knee height and trapped zombies.
+	extra = extra and table.clone(extra) or {}
+	if extra.CanCollide == nil then
+		extra.CanCollide = false
+	end
 	local d0, d1 = face, face + sign * 0.25
 	if axis == "x" then
 		return api.box("Panel", V(s0, y0, math.min(d0, d1)), V(s1, y1, math.max(d0, d1)), color, material, extra)
@@ -148,7 +154,7 @@ return function(api)
 	------------------------------------------------------------------
 	api.floor("Ground", -260, -112, 300, 225, 0, SAND, "Sand", {
 		{ 251, -59, 261, -9 }, -- motel storm drain
-		{ -70, -98, -20, -90 }, -- alley sewer ramp
+		{ -86, -99, -20, -89 }, -- alley sewer ramp (10 wide, gentle slope)
 	})
 
 	overlay(api, "MainStreet", -150, -32, 170, 4, ASPHALT, "Asphalt")
@@ -420,8 +426,11 @@ return function(api)
 		floorColor = C(230, 230, 230), floorMaterial = "Marble",
 	})
 	-- Chrome band + red stripe along the facade
-	panel(api, "x", -39.5, 1, -24, 36, 2.4, 3, C(200, 40, 50), "SmoothPlastic")
-	panel(api, "x", -39.5, 1, -24, 36, 8, 8.5, C(230, 230, 235), "Metal")
+	-- trim stripes stop at the front door (x 0..8)
+	for _, seg in { { -24, 0 }, { 8, 36 } } do
+		panel(api, "x", -39.5, 1, seg[1], seg[2], 2.4, 3, C(200, 40, 50), "SmoothPlastic")
+		panel(api, "x", -39.5, 1, seg[1], seg[2], 8, 8.5, C(230, 230, 235), "Metal")
+	end
 	-- Kitchen partition with a pass-through window and a doorway
 	api.wall("Diner_Kitchen", "x", -76, -23.5, 35.5, 0, 10, {
 		{ from = -12, to = 8, bottom = 3.6, height = 2.8 }, -- pass-through
@@ -430,9 +439,11 @@ return function(api)
 	api.box("Counter", V(-15, 0, -72), V(15, 3.5, -68), C(150, 40, 40), "SmoothPlastic")
 	api.box("CounterTop", V(-15.3, 3.5, -72.3), V(15.3, 3.8, -67.7), C(230, 230, 235), "Marble")
 	for x = -12, 12, 4 do
-		api.part({ Name = "Stool", Shape = Enum.PartType.Cylinder, Size = V(2.6, 1.6, 1.6), CFrame = CFrame.new(x, 1.3, -65.5) * CFrame.Angles(0, 0, math.rad(90)), Color = C(200, 40, 50), Material = "SmoothPlastic" })
+		-- stools are decor: non-collidable so zombies don't snag on them
+		api.part({ Name = "Stool", Shape = Enum.PartType.Cylinder, Size = V(2.6, 1.6, 1.6), CFrame = CFrame.new(x, 1.3, -65.5) * CFrame.Angles(0, 0, math.rad(90)), Color = C(200, 40, 50), Material = "SmoothPlastic", CanCollide = false })
 	end
-	for _, z in { -72, -52, -46 } do
+	-- booths along the east wall, clear of the kitchen doorway (x 22..28 at z -76)
+	for _, z in { -62, -52, -46 } do
 		api.box("Booth", V(30, 0, z), V(34, 3.2, z + 4), C(170, 40, 50), "Fabric")
 		api.box("BoothTable", V(26, 0, z + 0.5), V(29.5, 2.7, z + 3.5), C(220, 220, 225), "SmoothPlastic")
 	end
@@ -449,12 +460,18 @@ return function(api)
 	api.box("Crates", V(-86, 0, -110), V(-80, 4, -102), C(120, 90, 60), "WoodPlanks")
 	api.box("AlleyPipes", V(-96, 12, -84.8), V(36, 12.8, -84), METAL, "Metal")
 	-- Sewer ramp into the lab (rails around the opening)
-	api.ramp("SewerRamp", -70, -98, -20, -90, -20, 0, "w", CONCRETE)
-	api.box("SewerTrenchN", V(-70, -20, -99), V(-20, 0, -98), CONCRETE, "Concrete")
-	api.box("SewerTrenchS", V(-70, -20, -90), V(-20, 0, -89), CONCRETE, "Concrete")
-	api.box("SewerRailN", V(-64, 0, -99), V(-20, 3, -98.5), METAL, "Metal")
-	api.box("SewerRailS", V(-64, 0, -89.5), V(-20, 3, -89), METAL, "Metal")
-	api.box("SewerRailE", V(-20.5, 0, -99), V(-20, 3, -89), METAL, "Metal")
+	-- Sewer ramp into the lab: 10 wide, 66 long (gentle), lit, rails on the alley edges
+	api.ramp("SewerRamp", -86, -99, -20, -89, -20, 0, "w", CONCRETE)
+	api.box("SewerTrenchN", V(-86, -20, -100), V(-20, 0, -99), CONCRETE, "Concrete")
+	api.box("SewerTrenchS", V(-86, -20, -89), V(-20, 0, -88), CONCRETE, "Concrete")
+	api.box("SewerTrenchW", V(-87, -20, -100), V(-86, 0, -88), CONCRETE, "Concrete")
+	api.box("SewerRailN", V(-80, 0, -99.6), V(-20, 3, -99.1), METAL, "Metal")
+	api.box("SewerRailS", V(-80, 0, -88.9), V(-20, 3, -88.4), METAL, "Metal")
+	api.box("SewerRailE", V(-20, 0, -99.6), V(-19.5, 3, -88.4), METAL, "Metal")
+	for _, x in { -62, -38 } do
+		local rampY = -20 * (x + 86) / 66 -- ramp surface height here
+		light(api, V(x, rampY + 7, -98.6), C(140, 255, 180), 24)
+	end
 	for _, p in { V(-60, 9, -85), V(0, 9, -85), V(-92, 9, -60) } do
 		light(api, p, C(180, 255, 200), 24)
 	end
@@ -577,23 +594,61 @@ return function(api)
 	})
 	api.box("ControlPanel", V(266, -20, -79.5), V(269.5, -15, -75), C(70, 80, 90), "Metal")
 	api.box("ControlScreen", V(266, -17, -75.2), V(269, -15.5, -75), C(80, 255, 160), "Neon")
-	api.shell("Tunnel", 50, -76, 240, -64, -20, 10, {
-		color = C(100, 100, 102),
+	-- The old 190-stud straight tunnel is now two short tunnels with a big pump
+	-- chamber in the middle (cover, machinery, flickering lights).
+	for _, seg in { { "TunnelW", 50, 120 }, { "TunnelE", 180, 240 } } do
+		api.shell(seg[1], seg[2], -76, seg[3], -64, -20, 10, {
+			color = C(100, 100, 102),
+			openings = {
+				{ side = "e", from = -76, to = -64, height = 10 },
+				{ side = "w", from = -76, to = -64, height = 10 },
+			},
+			floorMaterial = "Concrete", floorColor = C(70, 70, 72),
+		})
+		local len, mid = seg[3] - seg[2], (seg[2] + seg[3]) / 2
+		api.part({ Name = "TunnelPipe", Shape = Enum.PartType.Cylinder, Size = V(len, 1.4, 1.4), Position = V(mid, -11.4, -74.6), Color = C(110, 80, 60), Material = "CorrodedMetal" })
+		api.part({ Name = "TunnelPipe", Shape = Enum.PartType.Cylinder, Size = V(len, 0.9, 0.9), Position = V(mid, -11.6, -72.6), Color = C(70, 90, 80), Material = "Metal" })
+	end
+	api.box("WaterChannel", V(50, -19.8, -71), V(240, -19.7, -69), C(50, 80, 70), "Glass", { Transparency = 0.3, CanCollide = false })
+
+	-- Pump chamber (x 120..180): tall room, pumps, pillars for cover, catwalk, flicker lights
+	api.shell("PumpChamber", 120, -96, 180, -44, -20, 16, {
+		color = C(92, 96, 98),
 		openings = {
 			{ side = "e", from = -76, to = -64, height = 10 },
 			{ side = "w", from = -76, to = -64, height = 10 },
 		},
-		floorMaterial = "Concrete", floorColor = C(70, 70, 72),
+		floorMaterial = "DiamondPlate", floorColor = C(66, 68, 70),
 	})
-	-- Pipes along the tunnel ceiling + a water channel strip
-	api.part({ Name = "TunnelPipe", Shape = Enum.PartType.Cylinder, Size = V(190, 1.4, 1.4), Position = V(145, -11.4, -74.6), Color = C(110, 80, 60), Material = "CorrodedMetal" })
-	api.part({ Name = "TunnelPipe", Shape = Enum.PartType.Cylinder, Size = V(190, 0.9, 0.9), Position = V(145, -11.6, -72.6), Color = C(70, 90, 80), Material = "Metal" })
-	api.box("WaterChannel", V(50, -19.8, -71), V(240, -19.7, -69), C(50, 80, 70), "Glass", { Transparency = 0.3, CanCollide = false })
+	for _, x in { 134, 166 } do
+		api.part({ Name = "PumpTank", Shape = Enum.PartType.Cylinder, Size = V(12, 9, 9), CFrame = CFrame.new(x, -14, -88) * CFrame.Angles(0, 0, math.rad(90)), Color = C(120, 70, 50), Material = "CorrodedMetal" })
+		api.box("PumpBase", V(x - 5, -20, -93), V(x + 5, -19, -83), C(60, 60, 64), "Metal")
+		api.box("PumpPipe", V(x - 0.7, -8, -88.7), V(x + 0.7, -4.2, -87.3), C(110, 80, 60), "CorrodedMetal")
+	end
+	api.box("PumpManifold", V(128, -6, -89), V(172, -4.6, -87.6), C(110, 80, 60), "CorrodedMetal")
+	api.box("ControlBank", V(144, -20, -54), V(156, -15, -50), C(60, 70, 80), "Metal")
+	api.box("ControlBankScreens", V(144.5, -17.5, -54.2), V(155.5, -15.8, -54), C(80, 255, 160), "Neon")
+	-- pillars flank the walkway: cover to fight around, not a straight corridor
+	for _, p in { V(136, 0, -60), V(164, 0, -60), V(136, 0, -80), V(164, 0, -80) } do
+		api.box("ChamberPillar", V(p.X - 1.5, -20, p.Z - 1.5), V(p.X + 1.5, -4, p.Z + 1.5), C(110, 110, 112), "Concrete")
+	end
+	api.box("ChamberCrates", V(148, -20, -82), V(152, -16, -78), C(120, 90, 60), "WoodPlanks")
+	api.box("ChamberCrates", V(126, -20, -52), V(132, -17, -47), C(120, 90, 60), "WoodPlanks")
+	api.box("ChamberCrates", V(170, -20, -60), V(174, -16.5, -56), C(120, 90, 60), "WoodPlanks")
+	-- catwalk on the north wall (decor, out of reach)
+	api.box("Catwalk", V(121, -11, -95.5), V(179, -10.6, -91), C(80, 82, 86), "DiamondPlate")
+	api.box("CatwalkRail", V(121, -10.6, -91.2), V(179, -9, -91), C(200, 170, 40), "Metal")
+	api.box("HazardStripe", V(120.6, -20, -76.5), V(121, -19.6, -63.5), C(240, 200, 30), "SmoothPlastic", { CanCollide = false })
+	api.box("HazardStripe", V(179, -20, -76.5), V(179.4, -19.6, -63.5), C(240, 200, 30), "SmoothPlastic", { CanCollide = false })
+	for _, p in { V(130, -5.5, -70), V(170, -5.5, -70), V(150, -5.5, -88), V(150, -5.5, -50) } do
+		local l = light(api, p, C(255, 200, 140), 30)
+		game:GetService("CollectionService"):AddTag(l, "Flicker")
+	end
 	api.shell("Lab", -20, -100, 50, -56, -20, 14, {
 		color = C(160, 165, 170),
 		openings = {
 			{ side = "e", from = -76, to = -64, height = 10 },
-			{ side = "w", from = -98, to = -90, height = 10 }, -- sewer ramp from the alley (D6)
+			{ side = "w", from = -99, to = -89, height = 12 }, -- sewer ramp from the alley (D6)
 		},
 		floorMaterial = "DiamondPlate", floorColor = C(90, 95, 100),
 	})
@@ -605,7 +660,7 @@ return function(api)
 	api.box("ServerRack", V(44, -20, -92), V(49.5, -11, -86.5), C(30, 30, 34), "Metal")
 	api.box("RackLights", V(43.8, -18, -99), V(44, -12, -87), C(80, 255, 120), "Neon")
 	api.box("Gurney", V(-16, -20, -86), V(-8, -17.4, -82), C(200, 200, 205), "Metal")
-	for _, p in { V(255, -9, -70), V(200, -10.4, -70), V(150, -10.4, -70), V(100, -10.4, -70), V(15, -6.4, -78), V(-10, -6.4, -62), V(-40, -2, -94) } do
+	for _, p in { V(255, -9, -70), V(205, -10.4, -70), V(90, -10.4, -70), V(15, -6.4, -78), V(-10, -6.4, -62), V(-40, -2, -94) } do
 		light(api, p, C(140, 255, 180), 24)
 	end
 
