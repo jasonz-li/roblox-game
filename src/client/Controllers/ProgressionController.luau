@@ -177,14 +177,106 @@ local function refreshOwned()
 end
 
 ----------------------------------------------------------------------
+-- Spirit Shards (saved currency), streak milestones, run summary
+----------------------------------------------------------------------
+
+local SHARD = Color3.fromRGB(150, 230, 255)
+
+local function buildShards()
+	ui.shards = label({
+		Text = "◆ 0",
+		TextSize = 22,
+		TextColor3 = SHARD,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -28, 0, 22),
+		Size = UDim2.fromOffset(240, 26),
+		Parent = gui,
+	})
+	label({
+		Text = "SPIRIT SHARDS",
+		Font = Enum.Font.GothamBold,
+		TextSize = 11,
+		TextColor3 = Color3.fromRGB(160, 170, 200),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -28, 0, 48),
+		Size = UDim2.fromOffset(240, 14),
+		Parent = gui,
+	})
+	ui.shardPopup = label({
+		Text = "",
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		TextColor3 = SHARD,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -28, 0, 64),
+		Size = UDim2.fromOffset(300, 18),
+		Parent = gui,
+	})
+	-- milestone callout (under the wave banner)
+	ui.milestone = label({
+		Text = "",
+		TextSize = 34,
+		TextColor3 = Color3.fromRGB(255, 220, 90),
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.32),
+		Size = UDim2.fromOffset(700, 40),
+		Parent = gui,
+	})
+	ui.milestoneSub = label({
+		Text = "",
+		Font = Enum.Font.GothamBold,
+		TextSize = 16,
+		TextColor3 = SHARD,
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.32, 32),
+		Size = UDim2.fromOffset(700, 20),
+		Parent = gui,
+	})
+	-- end-of-run summary (shown during game over)
+	ui.summary = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0.62, 0),
+		Size = UDim2.fromOffset(460, 118),
+		BackgroundColor3 = PANEL,
+		BackgroundTransparency = 0.2,
+		Visible = false,
+		ZIndex = 20,
+		Parent = gui,
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 10) }), new("UIStroke", { Color = SHARD, Thickness = 1.5, Transparency = 0.3 }) })
+	ui.summaryShards = label({ Text = "", TextSize = 26, TextColor3 = SHARD, Position = UDim2.fromOffset(0, 10), Size = UDim2.new(1, 0, 0, 30), ZIndex = 21, Parent = ui.summary })
+	ui.summaryLine = label({ Text = "", Font = Enum.Font.GothamBold, TextSize = 15, Position = UDim2.fromOffset(0, 46), Size = UDim2.new(1, 0, 0, 20), ZIndex = 21, Parent = ui.summary })
+	ui.summaryNote = label({ Text = "", Font = Enum.Font.GothamMedium, TextSize = 13, TextColor3 = Color3.fromRGB(170, 170, 195), TextWrapped = true, Position = UDim2.fromOffset(16, 72), Size = UDim2.new(1, -32, 0, 36), ZIndex = 21, Parent = ui.summary })
+end
+
+local function fadeOut(l, hold)
+	l.TextTransparency = 0
+	l.TextStrokeTransparency = 0.5
+	TweenService:Create(l, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, hold or 1.6), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+end
+
+local function refreshShards()
+	ui.shards.Text = "◆ " .. tostring(player:GetAttribute("Shards") or 0)
+end
+
+----------------------------------------------------------------------
 -- Lifecycle
 ----------------------------------------------------------------------
 
 function ProgressionController.Init()
-	gui = new("ScreenGui", { Name = "Progression", ResetOnSpawn = false, IgnoreGuiInset = true, Parent = player:WaitForChild("PlayerGui") })
+	gui = new("ScreenGui", { Name = "Progression", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 5, Parent = player:WaitForChild("PlayerGui") })
 	buildStreak()
 	buildCards()
 	buildOwned()
+	buildShards()
 end
 
 function ProgressionController.Start()
@@ -231,10 +323,42 @@ function ProgressionController.Start()
 		end
 	end)
 
+	player:GetAttributeChangedSignal("Shards"):Connect(refreshShards)
+	refreshShards()
+	local gameState = Remotes.GameState()
+	gameState:GetAttributeChangedSignal("State"):Connect(function()
+		if gameState:GetAttribute("State") ~= "GameOver" then
+			ui.summary.Visible = false
+		end
+	end)
+
 	Remotes.Get("Notify").OnClientEvent:Connect(function(kind, data)
 		if kind == "UpgradeChosen" then
 			local def = ProgressionConfig.Upgrades[data.id]
 			ui.offerTitle.Text = (def and def.Name or data.id) .. " " .. (ROMAN[data.stacks] or "")
+		elseif kind == "Shards" then
+			ui.shardPopup.Text = "+" .. data.amount .. " ◆  " .. (data.reason or "")
+			fadeOut(ui.shardPopup, 2)
+		elseif kind == "StreakMilestone" then
+			ui.milestone.Text = "STREAK " .. data.at .. (data.label and ("  ·  " .. data.label) or "")
+			local sub = "+" .. data.shards .. " Spirit Shards"
+			if data.uav then
+				sub ..= "  ·  live zombie radar for " .. data.uav .. "s"
+			end
+			if data.record then
+				sub ..= "  ·  NEW BEST"
+			end
+			ui.milestoneSub.Text = sub
+			fadeOut(ui.milestone, 1.8)
+			fadeOut(ui.milestoneSub, 1.8)
+			ui.streakScale.Scale = 1.8
+			TweenService:Create(ui.streakScale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+		elseif kind == "RunSummary" then
+			ui.summary.Visible = true
+			ui.summaryShards.Text = "+" .. data.shards .. " ◆ Spirit Shards   (total " .. data.total .. ")"
+			ui.summaryLine.Text = "Best streak this run: " .. data.runStreak .. "     Personal best: " .. data.bestStreak .. (data.newBestWave and "     NEW BEST WAVE" or "")
+			ui.summaryNote.Text = data.saved and "Saved to your profile. Spend Shards on hero summons (coming in the Gacha update)."
+				or "Not saved: progress is session-only (in Studio, enable API access in Game Settings > Security)."
 		end
 	end)
 end

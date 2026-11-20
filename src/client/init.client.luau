@@ -9,6 +9,7 @@ local ORDER = {
 	"SoundController",
 	"HudController",
 	"ProgressionController",
+	"MinimapController",
 	"WeaponController",
 }
 

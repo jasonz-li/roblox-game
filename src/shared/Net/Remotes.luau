@@ -12,7 +12,8 @@ local NAMES = {
 	"HitConfirm", -- S->C  (isHeadshot, isKill, totalDamage, hits: {{model, pos, damage, head, kill}}, isMelee)
 	"ShotFx", -- S->C  (shooter: Player, origin: Vector3, endPos: Vector3)
 	"Notify", -- S->C  (kind: string, data: any)
-	-- kinds: Points, WaveStart, WaveComplete, GameOver, Message, Sound, PowerUp, DoorOpened, UpgradeChosen
+	-- kinds: Points, WaveStart, WaveComplete, GameOver, Message, Sound, PowerUp, DoorOpened,
+	--        UpgradeChosen, Shards, StreakMilestone, RunSummary
 	"ChooseUpgrade", -- C->S  (index: number)  pick from the current upgrade offer
 }
 

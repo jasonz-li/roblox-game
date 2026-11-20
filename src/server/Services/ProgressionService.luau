@@ -20,6 +20,7 @@ local RemoteGuard = require(script.Parent.Parent.Util.RemoteGuard)
 local PlayerService = require(script.Parent.PlayerService)
 local CurrencyService = require(script.Parent.CurrencyService)
 local EnemyService = require(script.Parent.EnemyService)
+local DataService = require(script.Parent.DataService)
 -- PowerUpService requires WeaponService, which requires this module: load it in Start
 -- (after every module has finished loading) to avoid a require cycle.
 local PowerUpService
@@ -58,10 +59,39 @@ function ProgressionService.OnKill(player: Player, isHeadshot: boolean): number
 		streaks[player] = st
 	end
 	local mult = math.min(cfg.MaxMult, 1 + cfg.PerKill * st.count)
+	local before = st.count
 	st.count += isHeadshot and cfg.HeadshotPoints or 1
 	local window = ProgressionConfig.StreakWindow(player)
 	st.expires = now + window
 	setStreakAttrs(player, st.count, math.min(cfg.MaxMult, 1 + cfg.PerKill * st.count), workspace:GetServerTimeNow() + window)
+
+	DataService.AddKill(player)
+	if st.count > (player:GetAttribute("RunBestStreak") or 0) then
+		player:SetAttribute("RunBestStreak", st.count)
+	end
+	local record = DataService.RecordStreak(player, st.count)
+
+	-- Milestones crossed by this kill (headshots add 2, so check the range)
+	local last = cfg.Milestones[#cfg.Milestones]
+	for _, m in cfg.Milestones do
+		if before < m.At and st.count >= m.At then
+			DataService.AddShards(player, m.Shards, "Streak " .. m.At)
+			if m.Uav then
+				local untilT = math.max(player:GetAttribute("UavUntil") or 0, workspace:GetServerTimeNow()) + m.Uav
+				player:SetAttribute("UavUntil", untilT)
+			end
+			notify:FireClient(player, "StreakMilestone", { at = m.At, label = m.Label, shards = m.Shards, uav = m.Uav, record = record })
+		end
+	end
+	if st.count > last.At then
+		local steps = math.floor((st.count - last.At) / cfg.RepeatEvery)
+		local prevSteps = before > last.At and math.floor((before - last.At) / cfg.RepeatEvery) or 0
+		if steps > prevSteps then
+			local at = last.At + steps * cfg.RepeatEvery
+			DataService.AddShards(player, cfg.RepeatShards, "Streak " .. at)
+			notify:FireClient(player, "StreakMilestone", { at = at, label = "GODLIKE", shards = cfg.RepeatShards, record = record })
+		end
+	end
 
 	-- Bloodthirst heal
 	local heal = ProgressionConfig.HealPerKill(player)
@@ -176,7 +206,10 @@ function ProgressionService.Reset()
 		end
 		streaks[player] = nil
 		setStreakAttrs(player, 0, 1, 0)
+		player:SetAttribute("RunBestStreak", 0)
+		player:SetAttribute("UavUntil", 0)
 	end
+	DataService.StartRun()
 end
 
 ----------------------------------------------------------------------
@@ -198,6 +231,7 @@ local function onEnemyDied(data, killer: Player?)
 	local e = ProgressionConfig.Elite
 	if killer and killer.Parent then
 		CurrencyService.Add(killer, e.Points, "Elite", true)
+		DataService.AddShards(killer, ProgressionConfig.Rewards.ShardsPerElite, "Elite kill")
 		notify:FireAllClients("Message", { text = killer.DisplayName .. " slew an Elite", tone = "good" })
 	end
 	if e.DropPowerUp and data.root then

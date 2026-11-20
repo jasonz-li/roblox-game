@@ -40,6 +40,26 @@ local ProgressionConfig = {
 		HeadshotPoints = 2, -- headshot kills count double
 		MaxMult = 2.5,
 		BreakOnHit = true, -- getting hit by a zombie ends the streak
+		-- Milestones pay Spirit Shards (saved, for the gacha) and in-run rewards.
+		-- Past the last one, every RepeatEvery more kills pays RepeatShards again.
+		Milestones = {
+			{ At = 10, Shards = 5, Uav = 20, Label = "UAV ONLINE" },
+			{ At = 20, Shards = 12, Uav = 30, Label = "ADVANCED UAV" },
+			{ At = 30, Shards = 25, Label = "UNSTOPPABLE" },
+			{ At = 50, Shards = 50, Label = "LEGENDARY" },
+		},
+		RepeatEvery = 25,
+		RepeatShards = 50,
+	},
+	-- Spirit Shards from a run (besides streaks)
+	Rewards = {
+		ShardsPerWaveSurvived = 2,
+		ShardsPerElite = 3,
+	},
+	-- Minimap radar: a sweep shows every zombie briefly; a streak UAV shows them live.
+	Uav = {
+		SweepEvery = 12, -- seconds between free sweeps
+		SweepShows = 3, -- seconds the dots stay visible after a sweep
 	},
 	Elite = {
 		StartWave = 4,

@@ -16,6 +16,7 @@ local MapService = require(script.Parent.MapService)
 local MysteryBoxService = require(script.Parent.MysteryBoxService)
 local PowerUpService = require(script.Parent.PowerUpService)
 local ProgressionService = require(script.Parent.ProgressionService)
+local DataService = require(script.Parent.DataService)
 local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 
 local WaveService = {}
@@ -119,6 +120,7 @@ local function mainLoop()
 
 		setState("GameOver")
 		gameState:SetAttribute("FinalWave", wave)
+		DataService.EndRun(wave, ProgressionConfig.Rewards.ShardsPerWaveSurvived)
 		gameState:SetAttribute("RestartAt", workspace:GetServerTimeNow() + GameConfig.GameOverDuration)
 		notify:FireAllClients("GameOver", { wave = wave })
 		task.wait(GameConfig.GameOverDuration)
