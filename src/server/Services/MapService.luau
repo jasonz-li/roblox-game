@@ -1000,7 +1000,8 @@ function MapService.GetEnemySpawn(groundOnly: boolean?)
 	end
 	lastUsed[s] = now
 	lastDir = dirFromPlayers(roots, s.Position) or lastDir
-	return { pos = s.Position + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3)), barrier = nil, emerge = true }
+	-- exact spawn point (a random offset could land a zombie inside a wall or crate)
+	return { pos = s.Position, barrier = nil, emerge = true }
 end
 
 -- EnemyService tells us how many zombies are queued outside a window.

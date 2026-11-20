@@ -711,6 +711,20 @@ function EnemyService.Damage(data, amount: number, attacker: Player?, isHeadshot
 		return false
 	end
 	local hum = data.humanoid
+	-- Boss encounter hooks (BossService): shield, stagger window, threat, core damage
+	if data.immune then
+		return false
+	end
+	if data.vulnerableUntil and os.clock() < data.vulnerableUntil then
+		amount *= 1.5
+	end
+	if data.isBoss then
+		if attacker then
+			data.threat = data.threat or {}
+			data.threat[attacker] = (data.threat[attacker] or 0) + amount
+		end
+		data.recentDamage = (data.recentDamage or 0) + amount
+	end
 	local frozen = EnemyService.IsFrozen(data)
 	if frozen then
 		amount *= FROZEN_DAMAGE_MULT -- Shatter: frozen zombies take +50%
@@ -887,6 +901,27 @@ function EnemyService.SetHunting(on: boolean)
 	end
 end
 
+-- Is this point inside solid map geometry? (a zombie there can't be shot)
+local embedParams = OverlapParams.new()
+embedParams.FilterType = Enum.RaycastFilterType.Include
+embedParams.RespectCanCollide = true
+local function isEmbedded(pos: Vector3): boolean
+	local map = MapService.GetMapFolder()
+	if not map then
+		return false
+	end
+	embedParams.FilterDescendantsInstances = { map }
+	-- a small box at chest height; floors/ramps underfoot don't count
+	local parts = workspace:GetPartBoundsInBox(CFrame.new(pos + Vector3.new(0, 0.5, 0)), Vector3.new(0.8, 1.6, 0.8), embedParams)
+	for _, p in parts do
+		if p.CollisionGroup ~= "PlayerClip" and p.Transparency < 1 then
+			return true
+		end
+	end
+	return false
+end
+EnemyService.IsEmbedded = isEmbedded
+
 -- Move a lost/stuck zombie: it sinks away and claws up at a ground spawn near the players.
 local function relocate(data)
 	local info = MapService.GetEnemySpawn(true)
@@ -986,6 +1021,16 @@ local function aiTick(dt: number)
 			continue
 		end
 
+		-- BossService picks the Titan's target (threat / taunt), if that player is up
+		if data.forcedTarget and data.forcedTarget.Parent then
+			local fh = data.forcedTarget:FindFirstChildOfClass("Humanoid")
+			local fr = data.forcedTarget:FindFirstChild("HumanoidRootPart")
+			local fp = game.Players:GetPlayerFromCharacter(data.forcedTarget)
+			if fh and fr and fh.Health > 0 and not (fp and fp:GetAttribute("Downed")) then
+				target, dist = data.forcedTarget, (fr.Position - root.Position).Magnitude
+			end
+		end
+
 		local targetRoot = target.HumanoidRootPart
 		local targetPos = targetRoot.Position
 
@@ -1028,7 +1073,7 @@ local function aiTick(dt: number)
 		end
 
 		-- Titan ground slam: telegraphed ring, then damage + knockback inside it.
-		if data.isBoss and now >= (data.nextSlam or 0) and dist <= EnemyConfig.Boss.Slam.TriggerRange then
+		if data.isBoss and not data.immune and now >= (data.nextSlam or 0) and dist <= EnemyConfig.Boss.Slam.TriggerRange then
 			local s = EnemyConfig.Boss.Slam
 			data.nextSlam = now + s.Every
 			data.busyUntil = now + s.Windup + 0.4
@@ -1098,6 +1143,16 @@ local function aiTick(dt: number)
 			end
 			if not followPath(data) then
 				hum:MoveTo(targetPos)
+			end
+		end
+
+		-- Embedded in geometry (inside a wall/crate/building): it can't be shot there, so
+		-- move it out no matter how close it is to you.
+		if not data.isBoss and now >= (data.nextEmbedCheck or 0) then
+			data.nextEmbedCheck = now + 1.5
+			if isEmbedded(root.Position) then
+				relocate(data)
+				continue
 			end
 		end
 

@@ -131,7 +131,7 @@ return {
 		{ Zone = 4, Pos = V(265, 0, 0) }, { Zone = 4, Pos = V(180, 0, -70) }, { Zone = 4, Pos = V(180, 0, 50) }, { Zone = 4, Pos = V(275, 0, 40) },
 		{ Zone = 5, Pos = V(150, -20, -70) }, { Zone = 5, Pos = V(45, -20, -60) }, { Zone = 5, Pos = V(0, -20, -60) }, { Zone = 5, Pos = V(-10, -20, -80) },
 		-- more underground spawns: zombies come at you from several sides, not one hallway
-		{ Zone = 5, Pos = V(38, -20, -92) }, { Zone = 5, Pos = V(85, -20, -70) }, { Zone = 5, Pos = V(128, -20, -50) },
+		{ Zone = 5, Pos = V(38, -20, -92) }, { Zone = 5, Pos = V(85, -20, -70) }, { Zone = 5, Pos = V(140, -20, -52) }, -- (was inside the chamber crates)
 		{ Zone = 5, Pos = V(172, -20, -90) }, { Zone = 5, Pos = V(212, -20, -70) },
 	},
 
@@ -160,6 +160,16 @@ return {
 	-- Boss arena (Milestone 5): the widest stretch of Main Street, 3 exits.
 	BossArena = { Center = V(10, 0, -14), Size = V(150, 30, 52), BossSpawns = { V(-50, 0, -14), V(90, 0, -14) } },
 
+	-- The Hollow: the wave-10 raid arena, a cavern far below the town. After wave 9
+	-- the party drops in here and fights the Dust Titan (BossService).
+	Hollow = {
+		Center = V(0, -150, 470),
+		Radius = 64, -- walkable radius (lava beyond)
+		PlayerSpawns = { V(-12, -150, 515), V(12, -150, 515), V(-24, -150, 505), V(24, -150, 505) },
+		TotemSpots = { V(0, -150, 422), V(48, -150, 470), V(0, -150, 518), V(-48, -150, 470) },
+		Pillars = { V(-30, -150, 445), V(30, -150, 445), V(-30, -150, 495), V(30, -150, 495) },
+	},
+
 	-- Stage 3 post-processing (MapService applies these to Lighting)
 	PostFX = {
 		Atmosphere = { Density = 0.38, Offset = 0.1, Haze = 2.2, Glare = 0.4, Color = Color3.fromRGB(190, 140, 100), Decay = Color3.fromRGB(110, 70, 50) },
@@ -170,5 +180,6 @@ return {
 	BuildGeometry = function(api)
 		require(script.Geometry)(api) -- Stage 2 architecture
 		require(script.Environment)(api) -- Stage 3 destruction, fire, smoke, debris
+		require(script.Hollow)(api) -- the boss arena under the town
 	end,
 }
