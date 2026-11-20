@@ -88,18 +88,26 @@ function cast.Swordsman(player, hero, root, aim)
 	return true
 end
 
-function cast.Mage(player, hero, root, _aim)
+-- Yuki: Glacial Lance. A piercing ice spear along the aim line; damages everything on
+-- it and freezes whatever survives (frozen = can't move/attack, +50% damage taken).
+function cast.Mage(player, hero, root, aim)
 	local a = hero.Ability
-	local center = root.Position
+	local head = player.Character:FindFirstChild("Head") or root
+	local origin = head.Position
+	local dir = aim.Unit
+	local block = workspace:Raycast(origin, dir * a.Range, mapParams())
+	local length = block and (block.Position - origin).Magnitude or a.Range
 	local dmg = HeroConfig.Damage(a.Damage, wave())
-	for _, data in EnemyService.InRadius(center, a.Radius, true) do
-		local away = data.root.Position - center
-		local killed = hit(player, data, dmg, away.Magnitude > 0 and away.Unit or nil)
-		if not killed then
-			EnemyService.Slow(data, a.Slow, a.SlowTime)
+	for _, data in EnemyService.InRadius(origin + dir * (length / 2), length / 2 + a.Width) do
+		local rel = data.root.Position - origin
+		local t = math.clamp(rel:Dot(dir), 0, length)
+		if (rel - dir * t).Magnitude <= a.Width + 1 then
+			if not hit(player, data, dmg, dir) then
+				EnemyService.Freeze(data, a.Freeze, player)
+			end
 		end
 	end
-	notify:FireAllClients("AbilityFx", { kind = "FrostNova", by = player, pos = center, radius = a.Radius })
+	notify:FireAllClients("AbilityFx", { kind = "GlacialLance", by = player, from = origin, to = origin + dir * length })
 	return true
 end
 
@@ -131,40 +139,53 @@ function ult.Swordsman(player, hero, root, _aim)
 	return true
 end
 
-function ult.Mage(player, hero, root, aim)
+-- Yuki: Absolute Zero. A blizzard that follows her: every pulse batters and
+-- re-freezes everything inside, and frozen kills shatter into the crowd.
+function ult.Mage(player, hero, _root, _aim)
 	local u = hero.Ultimate
-	local head = player.Character:FindFirstChild("Head") or root
-	-- aim point: first thing the look ray hits (map or ground), else max range
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	local exclude = { EnemyService.GetFolder() }
-	for _, p in Players:GetPlayers() do
-		if p.Character then
-			table.insert(exclude, p.Character)
-		end
-	end
-	params.FilterDescendantsInstances = exclude
-	local result = workspace:Raycast(head.Position, aim.Unit * u.Range, params)
-	local target = result and result.Position or (head.Position + aim.Unit * u.Range)
-	-- drop onto the ground under that point
-	local ground = workspace:Raycast(target + Vector3.new(0, 4, 0), Vector3.new(0, -60, 0), mapParams())
-	if ground then
-		target = ground.Position
-	end
-	notify:FireAllClients("AbilityFx", { kind = "StarfallMark", by = player, pos = target, radius = u.Radius, delay = u.Delay })
 	player:SetAttribute("UltActive", true)
-	task.delay(u.Delay, function()
-		local dmg = HeroConfig.Damage(u.Damage, wave())
-		for _, data in EnemyService.InRadius(target, u.Radius, true) do
-			local away = data.root.Position - target
-			hit(player, data, dmg, (away.Magnitude > 0 and away.Unit or Vector3.yAxis) + Vector3.new(0, 0.6, 0))
+	notify:FireAllClients("AbilityFx", { kind = "AbsoluteZeroStart", by = player, radius = u.Radius, duration = u.Duration })
+	task.spawn(function()
+		local pulses = math.floor(u.Duration / u.Interval)
+		for i = 1, pulses do
+			if not PlayerService.IsAlive(player) then
+				break
+			end
+			local center = player.Character.HumanoidRootPart.Position
+			local dmg = HeroConfig.Damage(u.Damage, wave())
+			for _, data in EnemyService.InRadius(center, u.Radius, true) do
+				if not hit(player, data, dmg, nil) then
+					EnemyService.Freeze(data, u.Freeze, player)
+				end
+			end
+			if i % 2 == 1 then
+				notify:FireAllClients("AbilityFx", { kind = "AbsoluteZeroPulse", by = player, pos = center, radius = u.Radius })
+			end
+			task.wait(u.Interval)
 		end
-		notify:FireAllClients("AbilityFx", { kind = "Starfall", by = player, pos = target, radius = u.Radius })
 		if player.Parent then
 			player:SetAttribute("UltActive", false)
 		end
 	end)
 	return true
+end
+
+-- Shatter (Yuki's passive): a zombie killed while frozen bursts, hurting its neighbours
+-- (who may be frozen too... chains through a frozen crowd).
+local function onShatter(data)
+	local by = data.frozenBy
+	if not by or not by.Parent or not data.deathPosition then
+		return
+	end
+	local s = HeroConfig.Heroes.Mage.Shatter
+	task.defer(function()
+		local dmg = HeroConfig.Damage(s.Damage, wave())
+		EnemyService.Explode(data.deathPosition, s.Radius, dmg, by, function()
+			CurrencyService.AddKill(by)
+			local mult = ProgressionService.OnKill(by, false)
+			CurrencyService.Add(by, math.floor(GameConfig.Points.Kill * mult), "Shatter", true)
+		end, Color3.fromRGB(170, 225, 255))
+	end)
 end
 
 ----------------------------------------------------------------------
@@ -260,6 +281,9 @@ function AbilityService.Start()
 
 	-- Ultimate charge from kills (not from kills made by an active ultimate)
 	EnemyService.EnemyDied:Connect(function(data, killer, headshot)
+		if data.shatter then
+			onShatter(data)
+		end
 		if not killer or not killer.Parent or killer:GetAttribute("UltActive") then
 			return
 		end

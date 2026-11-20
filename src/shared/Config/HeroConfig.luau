@@ -44,29 +44,31 @@ local Heroes: { [string]: Hero } = {
 			Damage = 0.75, -- per pulse
 		},
 	},
+	-- Reworked (2026-11-20): "freeze, then shatter". Frost Nova/Starfall felt weak.
 	Mage = {
 		Id = "Mage",
 		Name = "Yuki",
 		Title = "Frost Oracle",
-		Color = Color3.fromRGB(190, 140, 255),
-		Passive = "Ultimate charges 30% faster",
-		UltChargeMult = 1.3,
+		Color = Color3.fromRGB(150, 210, 255),
+		Passive = "Shatter: frozen zombies take +50% damage and burst when killed",
+		Shatter = { Radius = 7, Damage = 0.5 }, -- blast when a frozen zombie dies
 		Ability = {
-			Name = "Frost Nova",
-			Desc = "Freeze-burst around you: damages and slows zombies",
-			Cooldown = 12,
-			Radius = 16,
-			Damage = 0.5,
-			Slow = 0.3, -- move at 30% speed
-			SlowTime = 3.5,
+			Name = "Glacial Lance",
+			Desc = "Piercing ice spear where you aim: damages the whole line and freezes survivors",
+			Cooldown = 9,
+			Range = 70,
+			Width = 3.5, -- hit radius around the spear's line
+			Damage = 1.0,
+			Freeze = 2.5, -- seconds frozen solid
 		},
 		Ultimate = {
-			Name = "Starfall",
-			Desc = "Call a star down where you aim",
-			Range = 160,
-			Radius = 19,
-			Delay = 0.9,
-			Damage = 3.2,
+			Name = "Absolute Zero",
+			Desc = "A blizzard follows you: everything inside is battered and frozen",
+			Duration = 6,
+			Interval = 0.5,
+			Radius = 18,
+			Damage = 0.2, -- per pulse
+			Freeze = 1.2,
 		},
 	},
 }

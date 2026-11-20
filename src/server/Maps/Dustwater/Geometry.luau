@@ -179,11 +179,11 @@ return function(api)
 	api.shell("WestHouse", -70, 120, -35, 160, 0, 11, {
 		color = C(186, 170, 150),
 		trimColor = TRIM,
+		-- Sealed (playtest: the house was a dead end that only trapped you). Doors are now
+		-- closed panels; the windows stay as dressing.
 		openings = {
-			{ side = "e", from = 136, to = 142, height = 7.5 }, -- front door
 			{ side = "e", from = 146, to = 152, bottom = 3, height = 4, glass = true },
 			{ side = "e", from = 153.5, to = 158, bottom = 3, height = 4, glass = true },
-			{ side = "w", from = 128, to = 134, height = 7.5 }, -- back door
 			{ side = "w", from = 144, to = 150, bottom = 3, height = 4, glass = true },
 			{ side = "n", from = -64, to = -57, bottom = 3, height = 4, glass = true },
 			{ side = "n", from = -49, to = -42, bottom = 3, height = 4, glass = true },
@@ -205,10 +205,9 @@ return function(api)
 	api.shell("EastHouse", 35, 115, 72, 150, 0, 11, {
 		color = C(170, 150, 126),
 		trimColor = TRIM,
+		-- Sealed like the west house (it only trapped you)
 		openings = {
-			{ side = "w", from = 140, to = 146, height = 7.5 }, -- front door
 			{ side = "w", from = 118, to = 124, bottom = 3, height = 4, glass = true },
-			{ side = "e", from = 125, to = 131, height = 7.5 }, -- back door
 			{ side = "e", from = 136, to = 144, bottom = 3, height = 4, glass = true },
 			{ side = "n", from = 42, to = 50, bottom = 3, height = 4, glass = true },
 			{ side = "n", from = 58, to = 66, bottom = 3, height = 4, glass = true },
@@ -223,6 +222,15 @@ return function(api)
 	api.box("Dresser", V(66, 0, 116), V(71, 4, 119), WOOD, "Wood")
 	api.box("Bookshelf", V(36, 0, 128), V(38, 8, 136), WOOD, "Wood")
 	api.box("EastHousePorch", V(31, 0, 137), V(35, 0.6, 149), C(140, 110, 80), "WoodPlanks")
+	-- Closed front doors (dressing on the sealed houses)
+	panel(api, "z", -35, 1, 136, 142, 0, 7.5, C(110, 70, 50), "WoodPlanks")
+	panel(api, "z", 35, -1, 140, 146, 0, 7.5, C(110, 70, 50), "WoodPlanks")
+	-- Fill the dead strips between the houses and the Elm Lane cliffs (x ±70..75):
+	-- rock spurs off the cliff, so there's no hidden corner to get trapped in.
+	api.box("CliffSpurW", V(-75, 0, 112), V(-69.5, 18, 168), C(120, 92, 70), "Rock")
+	api.box("CliffSpurE", V(71.5, 0, 108), V(75, 18, 157), C(120, 92, 70), "Rock")
+	api.clip("CliffSpurWClip", V(-75, 18, 112), V(-69.5, 90, 168))
+	api.clip("CliffSpurEClip", V(71.5, 18, 108), V(75, 90, 157))
 
 	-- Garage (Mystery Box spot 1 inside, against the east wall)
 	api.shell("Garage", 40, 170, 65, 200, 0, 10, {

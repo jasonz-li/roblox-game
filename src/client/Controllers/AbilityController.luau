@@ -256,6 +256,64 @@ function FX.Starfall(d)
 	end
 end
 
+-- Yuki (reworked): Glacial Lance + Absolute Zero
+function FX.GlacialLance(d)
+	local from, to = d.from, d.to
+	local len = (to - from).Magnitude
+	if len < 1 then
+		return
+	end
+	local mid = (from + to) / 2
+	local spear = fxPart({ Size = Vector3.new(0.9, 0.9, len), CFrame = CFrame.lookAt(mid, to), Color = Color3.fromRGB(180, 230, 255), Material = Enum.Material.Ice, Transparency = 0.15 })
+	fadeAndDie(spear, 0.55, { Size = Vector3.new(0.1, 0.1, len) })
+	local core = fxPart({ Size = Vector3.new(0.25, 0.25, len), CFrame = CFrame.lookAt(mid, to), Color = Color3.fromRGB(240, 250, 255), Transparency = 0 })
+	fadeAndDie(core, 0.3)
+	for i = 1, 4 do
+		local p = from:Lerp(to, i / 5)
+		local ringPart = fxPart({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.15, 1.5, 1.5), CFrame = CFrame.lookAt(p, to) * CFrame.Angles(0, math.rad(90), 0), Color = Color3.fromRGB(200, 240, 255), Transparency = 0.3 })
+		fadeAndDie(ringPart, 0.4, { Size = Vector3.new(0.15, 4, 4) })
+	end
+	for i = 1, 6 do
+		local shard = fxPart({ Size = Vector3.new(0.4, 0.4, 1.6), CFrame = CFrame.new(to) * CFrame.Angles(math.random() * 6, math.random() * 6, 0), Color = Color3.fromRGB(190, 235, 255), Material = Enum.Material.Ice, Transparency = 0.1 })
+		fadeAndDie(shard, 0.5, { CFrame = shard.CFrame * CFrame.new(0, 0, -3) })
+	end
+	SoundController.PlayAt("LaserShot", from, 120, 0.7)
+	if d.by == player then
+		CameraController.Kick(1.2, 0)
+	end
+end
+
+local zeroUntil = 0
+function FX.AbsoluteZeroStart(d)
+	if d.by == player then
+		zeroUntil = os.clock() + d.duration
+		ImpactController.Play("medium")
+		-- a cold tint over the caster's view while the blizzard lasts
+		local cc = Instance.new("ColorCorrectionEffect")
+		cc.Name = "AbsoluteZeroTint"
+		cc.TintColor = Color3.fromRGB(200, 230, 255)
+		cc.Saturation = -0.3
+		cc.Parent = game:GetService("Lighting")
+		task.delay(d.duration, function()
+			cc:Destroy()
+		end)
+	end
+	SoundController.Play("Nuke", 0.4, 1.6)
+end
+
+function FX.AbsoluteZeroPulse(d)
+	local dome = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * d.radius * 1.6, Position = d.pos, Color = Color3.fromRGB(200, 235, 255), Material = Enum.Material.Glass, Transparency = 0.75 })
+	fadeAndDie(dome, 0.9, { Size = Vector3.one * d.radius * 2.1 })
+	ring(d.pos, d.radius, Color3.fromRGB(180, 230, 255), 0.6, 0.3)
+	for i = 1, 8 do
+		local a = math.random() * math.pi * 2
+		local r = math.random() * d.radius
+		local flake = fxPart({ Size = Vector3.new(0.5, 0.5, 0.5), Position = d.pos + Vector3.new(math.cos(a) * r, 8, math.sin(a) * r), Color = Color3.fromRGB(240, 250, 255), Transparency = 0.1 })
+		fadeAndDie(flake, 0.9, { Position = flake.Position - Vector3.new(0, 7, 0) })
+	end
+	SoundController.PlayAt("ShotgunShot", d.pos, 80, 0.4)
+end
+
 -- Forge signature effects
 function FX.Explosion(d)
 	local color = d.color or Color3.fromRGB(255, 140, 40)

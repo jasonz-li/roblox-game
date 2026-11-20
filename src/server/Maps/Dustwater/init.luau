@@ -71,8 +71,6 @@ return {
 		{ axis = "z", at = -150, from = -112, to = 90, gaps = { { -32, 4 } } },
 		-- Main Street | Motel (D4 gate)
 		{ axis = "z", at = 170, from = -112, to = 90, gaps = { { -32, 4 } } },
-		-- Alley passage between the hardware store and the shops: sealed (was D3b)
-		{ axis = "x", at = -40, from = -96, to = -88, name = "AlleyPassageWall" },
 		-- Alley ends
 		{ axis = "z", at = -96, from = -112, to = -84 },
 		{ axis = "z", at = 36, from = -112, to = -84 },
@@ -82,6 +80,9 @@ return {
 		{ Id = "D1", Label = "Debris barricade", Cost = 750, ZoneA = 0, ZoneB = 1, Center = V(0, 0, 90), Axis = "x", Width = 28, Material = "Wood", Color = Color3.fromRGB(110, 80, 55) },
 		{ Id = "D2", Label = "Car wreck pile", Cost = 1000, ZoneA = 1, ZoneB = 2, Center = V(-150, 0, -14), Axis = "z", Width = 36, Material = "CorrodedMetal", Color = Color3.fromRGB(90, 70, 60) },
 		{ Id = "D3", Label = "Diner door", Cost = 1000, ZoneA = 1, ZoneB = 3, Center = V(4, 0, -40), Axis = "x", Width = 8, Height = 8, Color = Color3.fromRGB(150, 60, 50) },
+		-- Alley gate: same zones as D3, so buying EITHER opens both (one purchase).
+		-- Together they make the diner + alley a loop instead of a dead end.
+		{ Id = "D3b", Label = "Alley gate", Cost = 1000, ZoneA = 1, ZoneB = 3, Center = V(-92, 0, -40), Axis = "x", Width = 8, Material = "DiamondPlate", Color = Color3.fromRGB(80, 80, 85) },
 		{ Id = "D4", Label = "Motel gate", Cost = 1250, ZoneA = 1, ZoneB = 4, Center = V(170, 0, -14), Axis = "z", Width = 36, Material = "DiamondPlate", Color = Color3.fromRGB(80, 80, 85) },
 		{ Id = "D5", Label = "Storm drain", Cost = 1500, ZoneA = 4, ZoneB = 5, Center = V(256, 0, -8), Axis = "x", Width = 10, Height = 8, Material = "DiamondPlate", Color = Color3.fromRGB(70, 75, 80) },
 		{ Id = "D6", Label = "Sewer grate", Cost = 1500, ZoneA = 3, ZoneB = 5, Center = V(-20, -20, -94), Axis = "z", Width = 10, Height = 12, Material = "DiamondPlate", Color = Color3.fromRGB(70, 75, 80) },

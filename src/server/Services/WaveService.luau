@@ -44,6 +44,34 @@ local function intermission(duration: number)
 	task.wait(duration)
 end
 
+-- How strong the party's builds are (1 = fresh, up to 3). The Titan's health scales
+-- with it so a fully forged, fully picked build still gets a real boss fight.
+--   per player: 1 + 0.35 x best Forge level + 0.06 x upgrade picks + 0.05 x perks
+local function partyPower(): number
+	local total, n = 0, 0
+	for _, p in Players:GetPlayers() do
+		local forge = 0
+		for i = 1, 3 do
+			forge = math.max(forge, p:GetAttribute("Slot" .. i .. "Lvl") or 0)
+		end
+		local picks = 0
+		for name, v in p:GetAttributes() do
+			if name:sub(1, 4) == "Upg_" and typeof(v) == "number" then
+				picks += v
+			end
+		end
+		local perks = 0
+		for _, id in string.split(p:GetAttribute("PerkOrder") or "", ",") do
+			if id ~= "" then
+				perks += 1
+			end
+		end
+		total += 1 + 0.35 * forge + 0.06 * picks + 0.05 * perks
+		n += 1
+	end
+	return n > 0 and math.clamp(total / n, 1, 3) or 1
+end
+
 local function runWave()
 	wave += 1
 	gameState:SetAttribute("Wave", wave)
@@ -75,7 +103,7 @@ local function runWave()
 			pos = info and info.pos or layout.PlayerSpawn
 		end
 		task.wait(1.5)
-		EnemyService.SpawnBoss(wave, #Players:GetPlayers(), pos)
+		EnemyService.SpawnBoss(wave, #Players:GetPlayers(), pos, partyPower())
 	end
 
 	local spawned = 0
@@ -84,7 +112,7 @@ local function runWave()
 	local cap = math.min(EnemyConfig.MaxAlive, WaveConfig.AliveCap(escorts) + (isBossWave and 1 or 0))
 	EnemyService.SetHunting(false)
 	task.wait(WaveConfig.WaveStartDelay)
-	while spawned < escorts and not gameOver and not bossDown do
+	while spawned < escorts and not gameOver do
 		if EnemyService.AliveCount() < cap then
 			if EnemyService.Spawn("Shambler", wave, { elite = math.random() < eliteChance }) then
 				spawned += 1
@@ -201,14 +229,15 @@ function WaveService.Start()
 		killsThisWave += 1
 		updateRemaining()
 		if data.isBoss then
-			-- Titan down: every player is paid, the escort crumbles, the wave ends
+			-- Titan down: every player is paid. The wave is NOT over: the rest of the
+			-- escort still has to be cleared (it no longer crumbles with the Titan).
 			bossDown = true
 			gameState:SetAttribute("BossHealth", 0)
 			for _, p in Players:GetPlayers() do
 				CurrencyService.Add(p, EnemyConfig.Boss.Points, EnemyConfig.Boss.DisplayName .. " slain")
 			end
 			notify:FireAllClients("AbilityFx", { kind = "BossDown", pos = data.root.Position })
-			task.defer(EnemyService.KillAll)
+			notify:FireAllClients("Message", { text = "The Titan has fallen. Finish the horde!", tone = "good" })
 		end
 	end)
 	PlayerService.AllPlayersDead:Connect(function()

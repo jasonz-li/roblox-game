@@ -245,7 +245,7 @@ end
 
 -- Boss: the Dust Titan (wave 10 finale). Scaled-up zombie, stone + ember look.
 -- Its health is published on GameState (BossName / BossHealth / BossMax) for the HUD bar.
-function EnemyService.SpawnBoss(wave: number, playerCount: number, pos: Vector3)
+function EnemyService.SpawnBoss(wave: number, playerCount: number, pos: Vector3, power: number?)
 	local b = EnemyConfig.Boss
 	local look = { DisplayName = b.DisplayName, BodyColor = Color3.fromRGB(120, 105, 92) }
 	local model = buildModel(look, pos)
@@ -287,7 +287,8 @@ function EnemyService.SpawnBoss(wave: number, playerCount: number, pos: Vector3)
 	end
 	model:SetAttribute("Boss", true)
 	local humanoid = model.Humanoid
-	local maxHealth = math.floor(b.Health * (b.PlayerHealthMult[math.clamp(playerCount, 1, 4)] or 1))
+	-- scales with player count AND with how strong their builds are (WaveService.partyPower)
+	local maxHealth = math.floor(b.Health * (b.PlayerHealthMult[math.clamp(playerCount, 1, 4)] or 1) * (power or 1))
 	humanoid.MaxHealth = maxHealth
 	humanoid.Health = maxHealth
 	humanoid.WalkSpeed = b.WalkSpeed
@@ -642,6 +643,51 @@ function EnemyService.Burn(data, dps: number, duration: number, attacker: Player
 	end)
 end
 
+-- Freeze solid (Yuki): can't move or attack, encased in ice, takes +50% damage
+-- (Shatter). If it dies while frozen, it shatters: a small blast credited to `by`.
+local FROZEN_DAMAGE_MULT = 1.5
+function EnemyService.Freeze(data, seconds: number, by: Player?)
+	if data.dead or data.isBoss then
+		if data.isBoss and not data.dead then
+			EnemyService.Slow(data, 0.6, seconds) -- the Titan only slows
+		end
+		return
+	end
+	local untilT = os.clock() + seconds
+	data.frozenUntil = math.max(data.frozenUntil or 0, untilT)
+	data.frozenBy = by or data.frozenBy
+	EnemyService.Slow(data, 0, seconds)
+	data.humanoid:MoveTo(data.root.Position)
+	local torso = data.model:FindFirstChild("Torso")
+	if torso and not data.model:FindFirstChild("IceShell") then
+		local ice = Instance.new("Part")
+		ice.Name = "IceShell"
+		ice.Size = Vector3.new(torso.Size.X * 1.5, torso.Size.Y * 2.9, torso.Size.Z * 1.9)
+		ice.CFrame = torso.CFrame * CFrame.new(0, -torso.Size.Y * 0.35, 0)
+		ice.Color = Color3.fromRGB(170, 225, 255)
+		ice.Material = Enum.Material.Ice
+		ice.Transparency = 0.35
+		ice.CanCollide, ice.CanQuery, ice.CanTouch, ice.Massless = false, false, false, true
+		local w = Instance.new("WeldConstraint")
+		w.Part0, w.Part1 = torso, ice
+		w.Parent = ice
+		ice.Parent = data.model
+	end
+	task.delay(seconds + 0.05, function()
+		if not data.dead and data.frozenUntil and os.clock() >= data.frozenUntil then
+			data.frozenUntil = nil
+			local ice = data.model:FindFirstChild("IceShell")
+			if ice then
+				ice:Destroy()
+			end
+		end
+	end)
+end
+
+function EnemyService.IsFrozen(data): boolean
+	return data.frozenUntil ~= nil and os.clock() < data.frozenUntil
+end
+
 -- Live enemies whose root is within `radius` of `pos` (optionally only on the XZ plane).
 function EnemyService.InRadius(pos: Vector3, radius: number, flat: boolean?): { any }
 	local list = {}
@@ -665,7 +711,14 @@ function EnemyService.Damage(data, amount: number, attacker: Player?, isHeadshot
 		return false
 	end
 	local hum = data.humanoid
+	local frozen = EnemyService.IsFrozen(data)
+	if frozen then
+		amount *= FROZEN_DAMAGE_MULT -- Shatter: frozen zombies take +50%
+	end
 	hum.Health = math.max(0, hum.Health - amount)
+	if hum.Health <= 0 and frozen and data.frozenBy then
+		data.shatter = true -- handled after death below
+	end
 	if data.isBoss then
 		gameState:SetAttribute("BossHealth", hum.Health)
 	end
@@ -919,6 +972,12 @@ local function aiTick(dt: number)
 		if root.Position.Y - targetPos.Y > 2.5 and flatOff.Magnitude < 3 then
 			local away = flatOff.Magnitude > 0.1 and flatOff.Unit or Vector3.new(1, 0, 0)
 			root.AssemblyLinearVelocity = away * 22 + Vector3.new(0, -8, 0)
+		end
+
+		-- Frozen solid (Yuki): no moving, no attacking until it thaws.
+		if EnemyService.IsFrozen(data) then
+			hum:MoveTo(root.Position)
+			continue
 		end
 
 		-- Titan ground slam: telegraphed ring, then damage + knockback inside it.
