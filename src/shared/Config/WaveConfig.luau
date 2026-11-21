@@ -44,6 +44,38 @@ function WaveConfig.AliveCap(total: number): number
 	return math.clamp(math.ceil(total * 0.6), 8, 24) -- (was 40%: too much downtime)
 end
 
+-- Special zombie mix: chance per spawn of each type, by the wave it starts.
+--   wave 3: crawlers   4: brutes   5: spitters   6: exploders
+--   ~10% specials at wave 3 climbing to ~40% at wave 9
+local SPECIALS = {
+	{ id = "Crawler", from = 3, base = 0.08, per = 0.01, max = 0.14 },
+	{ id = "Brute", from = 4, base = 0.04, per = 0.01, max = 0.08 },
+	{ id = "Spitter", from = 5, base = 0.06, per = 0.01, max = 0.10 },
+	{ id = "Exploder", from = 6, base = 0.06, per = 0.01, max = 0.09 },
+}
+-- At most this many of a type alive at once (a wall of brutes isn't fun)
+WaveConfig.SpecialAliveCap = { Crawler = 6, Brute = 2, Spitter = 3, Exploder = 3 }
+
+function WaveConfig.PickEnemy(wave: number, aliveOf: (string) -> number): string
+	if wave >= 10 then
+		return "Shambler"
+	end
+	local roll = math.random()
+	for _, s in SPECIALS do
+		if wave >= s.from then
+			local chance = math.min(s.max, s.base + s.per * (wave - s.from))
+			if roll < chance then
+				if aliveOf(s.id) < (WaveConfig.SpecialAliveCap[s.id] or 99) then
+					return s.id
+				end
+				return "Shambler"
+			end
+			roll -= chance
+		end
+	end
+	return "Shambler"
+end
+
 -- Last N zombies of a wave (nothing left to spawn) go into hunt mode.
 WaveConfig.HuntWhenRemaining = 3
 

@@ -92,6 +92,19 @@ local function runWave()
 		boss = isBossWave and EnemyConfig.Boss.DisplayName or nil,
 	})
 
+	-- First appearance of each special zombie: a one-line warning with how to beat it
+	local intro = ({
+		[3] = "Crawlers incoming: low and fast, aim down",
+		[4] = "Brutes incoming: armored, go for the head",
+		[5] = "Spitters incoming: kill them before the acid lands",
+		[6] = "Exploders incoming: pop them inside the horde, not next to you",
+	})[wave]
+	if intro then
+		task.delay(1.5, function()
+			notify:FireAllClients("Message", { text = intro, tone = "bad" })
+		end)
+	end
+
 	if isBossWave then
 		-- The raid: the party drops into the Hollow and fights the Titan (BossService).
 		-- No zombie escort; the fight is the mechanics.
@@ -114,7 +127,8 @@ local function runWave()
 	task.wait(WaveConfig.WaveStartDelay)
 	while spawned < escorts and not gameOver do
 		if EnemyService.AliveCount() < cap then
-			if EnemyService.Spawn("Shambler", wave, { elite = math.random() < eliteChance }) then
+			local kind = WaveConfig.PickEnemy(wave, EnemyService.AliveOfType)
+			if EnemyService.Spawn(kind, wave, { elite = kind == "Shambler" and math.random() < eliteChance }) then
 				spawned += 1
 				task.wait(interval * (0.75 + math.random() * 0.5)) -- ±25% jitter
 			else
@@ -226,9 +240,14 @@ function WaveService.Init()
 end
 
 function WaveService.Start()
-	EnemyService.EnemyDied:Connect(function(data)
+	EnemyService.EnemyDied:Connect(function(data, killer)
 		killsThisWave += 1
 		updateRemaining()
+		-- special zombies pay a bounty on top of the normal kill points
+		local bonus = data.stats and data.stats.BonusPoints
+		if bonus and killer and killer.Parent then
+			CurrencyService.Add(killer, bonus, data.stats.DisplayName, true)
+		end
 		if data.isBoss then
 			-- Titan down: every player is paid. The wave is NOT over: the rest of the
 			-- escort still has to be cleared (it no longer crumbles with the Titan).

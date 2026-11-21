@@ -79,44 +79,110 @@ local function jointedPart(model, root, name, size, pivot: CFrame, partFromPivot
 	return p
 end
 
+-- Height of the root's center above the ground for a body shape (Crawlers lie low)
+local CRAWLER_HIP = 0.3
+local function rootHeightFor(stats): number
+	if stats.Shape == "Crawler" then
+		return CRAWLER_HIP + 1
+	end
+	return HIP_HEIGHT + 1
+end
+
 local function buildModel(stats, position: Vector3): Model
 	local model = Instance.new("Model")
 	model.Name = stats.DisplayName
+	local shape = stats.Shape or "Shambler"
 
 	local root = Instance.new("Part")
 	root.Name = "HumanoidRootPart"
 	root.Size = Vector3.new(2, 2, 1)
 	root.Transparency = 1
 	root.CanCollide = true
-	root.CFrame = CFrame.new(position + Vector3.new(0, HIP_HEIGHT + 1, 0)) * CFrame.Angles(0, math.rad(math.random(0, 359)), 0)
+	root.CFrame = CFrame.new(position + Vector3.new(0, rootHeightFor(stats), 0)) * CFrame.Angles(0, math.rad(math.random(0, 359)), 0)
 	root.Parent = model
 	model.PrimaryPart = root
 
 	local skin = stats.BodyColor
 	local cloth = Color3.fromRGB(60, 52, 70)
-	weldedPart(model, root, "Torso", Vector3.new(2, 2, 1), CFrame.new(), cloth)
-	-- Invisible body collider (y 1.6..5.4 above the ground): zombies shove each other
-	-- into a crowd instead of overlapping, and it's too tall to step up onto.
-	-- CanQuery off so bullets/knife still hit the visible parts.
-	local collider = weldedPart(model, root, "Collider", Vector3.new(2.2, 3.8, 1.6), CFrame.new(0, 0.5, 0), cloth)
-	collider.Transparency = 1
-	collider.CanCollide = true
-	collider.CanQuery = false
-	collider.CanTouch = false
-	collider.CastShadow = false
-	local head = weldedPart(model, root, "Head", Vector3.new(1.3, 1.3, 1.3), CFrame.new(0, 1.65, 0), skin)
-	-- arms reach forward from the shoulder; legs hang from the hip
-	jointedPart(model, root, "LeftArm", Vector3.new(0.6, 0.6, 1.9), CFrame.new(-1.3, 0.6, 0.15), CFrame.new(0, 0, -0.95), skin)
-	jointedPart(model, root, "RightArm", Vector3.new(0.6, 0.6, 1.9), CFrame.new(1.3, 0.6, 0.15), CFrame.new(0, 0, -0.95), skin)
-	jointedPart(model, root, "LeftLeg", Vector3.new(0.8, 2, 0.8), CFrame.new(-0.5, -1, 0), CFrame.new(0, -1, 0), cloth)
-	jointedPart(model, root, "RightLeg", Vector3.new(0.8, 2, 0.8), CFrame.new(0.5, -1, 0), CFrame.new(0, -1, 0), cloth)
+	local eyeColor = Color3.fromRGB(255, 40, 60)
+	local head
+	if shape == "Crawler" then
+		-- dragging itself along on its arms, legs trailing behind
+		weldedPart(model, root, "Torso", Vector3.new(1.8, 0.9, 2.4), CFrame.new(0, 0, 0.2), cloth)
+		local collider = weldedPart(model, root, "Collider", Vector3.new(2.2, 1.7, 3.4), CFrame.new(0, 0.1, 0.3), cloth)
+		collider.Transparency = 1
+		collider.CanCollide = true
+		collider.CanQuery = false
+		collider.CanTouch = false
+		collider.CastShadow = false
+		head = weldedPart(model, root, "Head", Vector3.new(1.05, 1.05, 1.05), CFrame.new(0, 0.3, -1.45), skin)
+		jointedPart(model, root, "LeftArm", Vector3.new(0.5, 0.5, 1.9), CFrame.new(-1.05, 0.1, -0.9) * CFrame.Angles(math.rad(-30), 0, 0), CFrame.new(0, 0, -0.95), skin)
+		jointedPart(model, root, "RightArm", Vector3.new(0.5, 0.5, 1.9), CFrame.new(1.05, 0.1, -0.9) * CFrame.Angles(math.rad(-30), 0, 0), CFrame.new(0, 0, -0.95), skin)
+		jointedPart(model, root, "LeftLeg", Vector3.new(0.7, 1.9, 0.7), CFrame.new(-0.45, -0.1, 1.3) * CFrame.Angles(math.rad(-82), 0, 0), CFrame.new(0, -0.95, 0), cloth)
+		jointedPart(model, root, "RightLeg", Vector3.new(0.7, 1.9, 0.7), CFrame.new(0.45, -0.1, 1.3) * CFrame.Angles(math.rad(-78), 0, 0), CFrame.new(0, -0.95, 0), cloth)
+		eyeColor = Color3.fromRGB(255, 200, 90)
+	else
+		local torsoSize = shape == "Exploder" and Vector3.new(2.6, 2.3, 1.9) or Vector3.new(2, 2, 1)
+		local torso = weldedPart(model, root, "Torso", torsoSize, CFrame.new(), shape == "Exploder" and Color3.fromRGB(120, 70, 45) or cloth)
+		-- Invisible body collider (y 1.6..5.4 above the ground): zombies shove each other
+		-- into a crowd instead of overlapping, and it's too tall to step up onto.
+		-- CanQuery off so bullets/knife still hit the visible parts.
+		local collider = weldedPart(model, root, "Collider", Vector3.new(2.2, 3.8, 1.6), CFrame.new(0, 0.5, 0), cloth)
+		collider.Transparency = 1
+		collider.CanCollide = true
+		collider.CanQuery = false
+		collider.CanTouch = false
+		collider.CastShadow = false
+		head = weldedPart(model, root, "Head", Vector3.new(1.3, 1.3, 1.3), CFrame.new(0, 1.65, 0), skin)
+		-- arms reach forward from the shoulder; legs hang from the hip
+		jointedPart(model, root, "LeftArm", Vector3.new(0.6, 0.6, 1.9), CFrame.new(-1.3, 0.6, 0.15), CFrame.new(0, 0, -0.95), skin)
+		jointedPart(model, root, "RightArm", Vector3.new(0.6, 0.6, 1.9), CFrame.new(1.3, 0.6, 0.15), CFrame.new(0, 0, -0.95), skin)
+		jointedPart(model, root, "LeftLeg", Vector3.new(0.8, 2, 0.8), CFrame.new(-0.5, -1, 0), CFrame.new(0, -1, 0), cloth)
+		jointedPart(model, root, "RightLeg", Vector3.new(0.8, 2, 0.8), CFrame.new(0.5, -1, 0), CFrame.new(0, -1, 0), cloth)
+
+		if shape == "Brute" then
+			-- scrap-metal plates: shoulders, chest, a riveted helmet brim (the face stays open)
+			local metal = Color3.fromRGB(70, 72, 78)
+			weldedPart(model, root, "Armor", Vector3.new(2.3, 1.5, 1.25), CFrame.new(0, 0.15, -0.05), metal, Enum.Material.DiamondPlate)
+			weldedPart(model, root, "Armor", Vector3.new(1.0, 0.45, 1.2), CFrame.new(-1.35, 1.05, 0), metal, Enum.Material.Metal)
+			weldedPart(model, root, "Armor", Vector3.new(1.0, 0.45, 1.2), CFrame.new(1.35, 1.05, 0), metal, Enum.Material.Metal)
+			torso.Color = Color3.fromRGB(45, 40, 38)
+			eyeColor = Color3.fromRGB(255, 120, 40)
+		elseif shape == "Spitter" then
+			-- swollen acid sac on the throat and back, glowing
+			local acid = Color3.fromRGB(150, 255, 60)
+			local sac = weldedPart(model, root, "Sac", Vector3.new(1.4, 1.2, 1.0), CFrame.new(0, 0.35, 0.75), acid, Enum.Material.Neon)
+			sac.Shape = Enum.PartType.Ball
+			sac.Size = Vector3.one * 1.4
+			weldedPart(model, root, "Sac", Vector3.new(0.9, 0.5, 0.5), CFrame.new(0, 0.95, -0.55), acid, Enum.Material.Neon)
+			local glow = Instance.new("PointLight")
+			glow.Color = acid
+			glow.Range = 9
+			glow.Brightness = 1.2
+			glow.Parent = sac
+			eyeColor = acid
+		elseif shape == "Exploder" then
+			-- bloated, cracked open with fire inside
+			for i, cf in { CFrame.new(-0.5, 0.3, -0.96), CFrame.new(0.55, -0.4, -0.96), CFrame.new(0.1, 0.7, 0.96) } do
+				local crack = weldedPart(model, root, "EmberCrack", Vector3.new(0.18, 1.1 - i * 0.15, 0.06), cf * CFrame.Angles(0, 0, math.rad(20 * i)), Color3.fromRGB(255, 140, 40), Enum.Material.Neon)
+				crack.CanQuery = false
+			end
+			local glow = Instance.new("PointLight")
+			glow.Name = "FuseGlow"
+			glow.Color = Color3.fromRGB(255, 130, 40)
+			glow.Range = 10
+			glow.Brightness = 1.4
+			glow.Parent = torso
+			eyeColor = Color3.fromRGB(255, 170, 40)
+		end
+	end
 	-- Glowing eyes (child of head so they count as head hits)
 	for _, x in { -0.3, 0.3 } do
 		local eye = Instance.new("Part")
 		eye.Name = "Eye"
 		eye.Size = Vector3.new(0.25, 0.18, 0.05)
-		eye.CFrame = head.CFrame * CFrame.new(x, 0.15, -0.66)
-		eye.Color = Color3.fromRGB(255, 40, 60)
+		eye.CFrame = head.CFrame * CFrame.new(x * head.Size.X / 1.3, 0.15, -head.Size.Z / 2 - 0.01)
+		eye.Color = eyeColor
 		eye.Material = Enum.Material.Neon
 		eye.CanCollide = false
 		eye.CanQuery = false
@@ -143,7 +209,7 @@ local function buildModel(stats, position: Vector3): Model
 
 	local humanoid = Instance.new("Humanoid")
 	humanoid.RigType = Enum.HumanoidRigType.R15
-	humanoid.HipHeight = HIP_HEIGHT
+	humanoid.HipHeight = shape == "Crawler" and CRAWLER_HIP or HIP_HEIGHT
 	humanoid.RequiresNeck = false
 	humanoid.BreakJointsOnDeath = false
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
@@ -384,15 +450,28 @@ function EnemyService.Spawn(enemyId: string, wave: number, opts)
 		return nil
 	end
 	local model = buildModel(stats, spawnInfo.pos)
+	local scale = 1
 	if isElite then
 		makeElite(model, spawnInfo.pos)
+		scale = ProgressionConfig.Elite.Scale
+	elseif stats.Scale then
+		scale = stats.Scale
+		model:ScaleTo(scale)
+		model.Humanoid.HipHeight = HIP_HEIGHT * scale
+		model:PivotTo(CFrame.new(spawnInfo.pos + Vector3.new(0, rootHeightFor(stats) * scale, 0)) * model:GetPivot().Rotation)
 	end
 	local humanoid = model.Humanoid
 	local maxHealth = math.floor(stats.BaseHealth * WaveConfig.HealthMultiplier(wave) * (isElite and ProgressionConfig.Elite.HealthMult or 1))
 	humanoid.MaxHealth = maxHealth
 	humanoid.Health = maxHealth
 	local isRunner = isElite or math.random() < WaveConfig.RunnerChance(wave)
+	if stats.Id == "Brute" then
+		isRunner = false -- brutes always lumber (until the hunt)
+	elseif stats.Id == "Exploder" then
+		isRunner = true
+	end
 	humanoid.WalkSpeed = isRunner and stats.RunSpeed * (isElite and 0.9 or 1) or stats.WalkSpeed
+	model:SetAttribute("Kind", stats.Id)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.CollisionGroup = "Enemies"
@@ -402,7 +481,7 @@ function EnemyService.Spawn(enemyId: string, wave: number, opts)
 	local root = model.PrimaryPart
 	local busyUntil = 0
 	if spawnInfo.emerge then
-		busyUntil = emergeAt(model, root.CFrame, isElite and ProgressionConfig.Elite.Scale or 1)
+		busyUntil = emergeAt(model, root.CFrame, scale)
 	else
 		model.Parent = enemiesFolder
 		root:SetNetworkOwner(nil) -- server-owned physics: no client control, no ownership jitter
@@ -424,6 +503,9 @@ function EnemyService.Spawn(enemyId: string, wave: number, opts)
 		stats = stats,
 		damage = stats.Damage * WaveConfig.DamageMultiplier(wave) * (isElite and ProgressionConfig.Elite.DamageMult or 1),
 		isElite = isElite,
+		kind = stats.Id,
+		scale = scale ~= 1 and scale or nil,
+		rootHeight = rootHeightFor(stats) * scale,
 		dead = false,
 		lastAttack = 0,
 		nextGroan = os.clock() + math.random() * 3,
@@ -464,6 +546,17 @@ end
 
 function EnemyService.AliveCount(): number
 	return aliveCount
+end
+
+-- How many of one zombie type are alive (WaveService caps specials)
+function EnemyService.AliveOfType(kind: string): number
+	local n = 0
+	for _, data in enemies do
+		if not data.dead and data.kind == kind then
+			n += 1
+		end
+	end
+	return n
 end
 
 ----------------------------------------------------------------------
@@ -758,6 +851,39 @@ function EnemyService.InRadius(pos: Vector3, radius: number, flat: boolean?): { 
 	return list
 end
 
+-- Exploder blast. Hurts players near it (less if it was shot dead rather than
+-- reaching you) and zombies around it; zombie kills are credited to whoever shot it.
+local function exploderBlast(data, pos: Vector3, attacker: Player?, reachedTarget: boolean)
+	local b = data.stats.Blast
+	local playerDamage = b.PlayerDamage * WaveConfig.DamageMultiplier(1) * (reachedTarget and 1 or b.DeathPlayerMult)
+	for _, char in PlayerService.GetAliveCharacters() do
+		local r = char:FindFirstChildOfClass("Humanoid") and char:FindFirstChild("HumanoidRootPart")
+		if r then
+			local d = (r.Position - pos).Magnitude
+			if d <= b.Radius then
+				PlayerService.Damage(char, playerDamage * (1 - 0.5 * d / b.Radius))
+				local p = game.Players:GetPlayerFromCharacter(char)
+				local away = Vector3.new(r.Position.X - pos.X, 0, r.Position.Z - pos.Z)
+				if p then
+					notify:FireClient(p, "Impact", { tier = "medium" })
+					if away.Magnitude > 0.1 then
+						notify:FireClient(p, "Knockback", { vel = away.Unit * 35 + Vector3.new(0, 25, 0) })
+					end
+				end
+			end
+		end
+	end
+	local onKill
+	if attacker then
+		onKill = function()
+			local CurrencyService = require(script.Parent.CurrencyService)
+			CurrencyService.AddKill(attacker)
+			CurrencyService.Add(attacker, GameConfigRef.Points.Kill, "Exploder blast", true)
+		end
+	end
+	EnemyService.Explode(pos, b.Radius, b.ZombieDamage, attacker, onKill, Color3.fromRGB(255, 130, 40))
+end
+
 -- Returns true if this hit killed the enemy. hitDir (optional) = direction of the shot, for knockback.
 function EnemyService.Damage(data, amount: number, attacker: Player?, isHeadshot: boolean, hitDir: Vector3?): boolean
 	if data.dead then
@@ -777,6 +903,10 @@ function EnemyService.Damage(data, amount: number, attacker: Player?, isHeadshot
 			data.threat[attacker] = (data.threat[attacker] or 0) + amount
 		end
 		data.recentDamage = (data.recentDamage or 0) + amount
+	end
+	-- Brute armor: body hits are cut down, headshots go through
+	if data.stats and data.stats.Armor and not isHeadshot then
+		amount *= 1 - data.stats.Armor
 	end
 	local frozen = EnemyService.IsFrozen(data)
 	if frozen then
@@ -802,6 +932,10 @@ function EnemyService.Damage(data, amount: number, attacker: Player?, isHeadshot
 	data.deathPosition = deathPos
 	despawn(data, hitDir, isHeadshot)
 	EnemyService.EnemyDied:Fire(data, attacker, isHeadshot)
+	if data.stats and data.stats.Blast and not data.detonated then
+		data.detonated = true
+		exploderBlast(data, deathPos, attacker, false)
+	end
 	return true
 end
 
@@ -987,9 +1121,148 @@ local function relocate(data)
 	data.waypoints = nil
 	data.checkAt = nil
 	data.stuckTime = 0
-	local finalCf = CFrame.new(info.pos + Vector3.new(0, (HIP_HEIGHT + 1) * scale, 0))
+	local finalCf = CFrame.new(info.pos + Vector3.new(0, data.rootHeight or (HIP_HEIGHT + 1) * scale, 0))
 	data.busyUntil = emergeAt(data.model, finalCf, scale)
 	data.lastPos = finalCf.Position
+end
+
+----------------------------------------------------------------------
+-- Special zombie attacks
+----------------------------------------------------------------------
+
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Include
+
+-- Spitter: lob a glob of acid in an arc at where the target is heading; it leaves a
+-- burning pool for a few seconds. The glob is visible in flight, so you can dodge it.
+local function spit(data, target: Model)
+	local s = data.stats.Spit
+	local head = data.model:FindFirstChild("Head")
+	local tr = target:FindFirstChild("HumanoidRootPart")
+	if not head or not tr then
+		return
+	end
+	local v = tr.AssemblyLinearVelocity
+	local aim = tr.Position + Vector3.new(v.X, 0, v.Z) * s.Flight * 0.5
+	groundParams.FilterDescendantsInstances = { MapService.GetMapFolder() }
+	local hit = workspace:Raycast(aim + Vector3.new(0, 4, 0), Vector3.new(0, -30, 0), groundParams)
+	local land = hit and hit.Position or (aim - Vector3.new(0, 3, 0))
+	local from = head.Position
+
+	local glob = Instance.new("Part")
+	glob.Name = "AcidGlob"
+	glob.Shape = Enum.PartType.Ball
+	glob.Size = Vector3.one * 1.1
+	glob.Material = Enum.Material.Neon
+	glob.Color = Color3.fromRGB(150, 255, 60)
+	glob.Anchored, glob.CanCollide, glob.CanQuery, glob.CanTouch = true, false, false, false
+	glob.CFrame = CFrame.new(from)
+	glob.Parent = workspace
+	local trail = Instance.new("ParticleEmitter")
+	trail.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	trail.Color = ColorSequence.new(Color3.fromRGB(150, 255, 60))
+	trail.LightEmission = 0.6
+	trail.Size = NumberSequence.new(0.6, 0)
+	trail.Lifetime = NumberRange.new(0.25, 0.4)
+	trail.Rate = 40
+	trail.Speed = NumberRange.new(0, 1)
+	trail.Parent = glob
+	playSound(data, "ZombieAttack")
+
+	task.spawn(function()
+		local t0 = os.clock()
+		local apex = math.max(from.Y, land.Y) + 6 + (land - from).Magnitude * 0.12
+		while true do
+			local t = math.min(1, (os.clock() - t0) / s.Flight)
+			local flatPos = from:Lerp(land, t)
+			-- parabola through from -> apex -> land
+			local y = (1 - t) ^ 2 * from.Y + 2 * (1 - t) * t * (2 * apex - (from.Y + land.Y) / 2) + t ^ 2 * land.Y
+			glob.CFrame = CFrame.new(flatPos.X, y, flatPos.Z)
+			if t >= 1 then
+				break
+			end
+			task.wait()
+		end
+		glob:Destroy()
+
+		local pool = Instance.new("Part")
+		pool.Name = "AcidPool"
+		pool.Shape = Enum.PartType.Cylinder
+		pool.Size = Vector3.new(0.2, s.PoolRadius * 2, s.PoolRadius * 2)
+		pool.CFrame = CFrame.new(land + Vector3.new(0, 0.12, 0)) * CFrame.Angles(0, 0, math.rad(90))
+		pool.Material = Enum.Material.Neon
+		pool.Color = Color3.fromRGB(120, 230, 50)
+		pool.Transparency = 0.35
+		pool.Anchored, pool.CanCollide, pool.CanQuery, pool.CanTouch = true, false, false, false
+		pool.Parent = workspace
+		local bubbles = Instance.new("ParticleEmitter")
+		bubbles.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		bubbles.Color = ColorSequence.new(Color3.fromRGB(160, 255, 80))
+		bubbles.Size = NumberSequence.new(1.2, 2.5)
+		bubbles.Transparency = NumberSequence.new(0.5, 1)
+		bubbles.Lifetime = NumberRange.new(0.8, 1.2)
+		bubbles.Rate = 10
+		bubbles.Speed = NumberRange.new(1, 2)
+		bubbles.EmissionDirection = Enum.NormalId.Right -- cylinder's axis points up
+		bubbles.Parent = pool
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(150, 255, 60)
+		light.Range = s.PoolRadius * 2
+		light.Brightness = 1
+		light.Parent = pool
+
+		local untilT = os.clock() + s.PoolTime
+		local dmg = s.PoolDps * 0.5 * WaveConfig.DamageMultiplier(1)
+		while os.clock() < untilT do
+			for _, char in PlayerService.GetAliveCharacters() do
+				local r = char:FindFirstChild("HumanoidRootPart")
+				if r then
+					local off = r.Position - land
+					if Vector3.new(off.X, 0, off.Z).Magnitude <= s.PoolRadius and off.Y > -2 and off.Y < 5 then
+						PlayerService.Damage(char, dmg)
+					end
+				end
+			end
+			task.wait(0.5)
+		end
+		TweenService:Create(pool, TweenInfo.new(0.5), { Transparency = 1 }):Play()
+		task.delay(0.55, function()
+			pool:Destroy()
+		end)
+	end)
+end
+
+-- Exploder: plant its feet, flash and hiss for the fuse, then blow.
+local function lightFuse(data)
+	local b = data.stats.Blast
+	data.busyUntil = os.clock() + b.Fuse + 1
+	data.humanoid:MoveTo(data.root.Position)
+	data.humanoid.WalkSpeed = 0
+	local torso = data.model:FindFirstChild("Torso")
+	local glow = torso and torso:FindFirstChild("FuseGlow")
+	playSound(data, "ZombieGroan")
+	task.spawn(function()
+		local t0 = os.clock()
+		local on = false
+		while not data.dead and os.clock() - t0 < b.Fuse do
+			on = not on
+			if torso then
+				torso.Color = on and Color3.fromRGB(255, 200, 120) or Color3.fromRGB(120, 70, 45)
+			end
+			if glow then
+				glow.Brightness = on and 6 or 1.4
+				glow.Range = on and 16 or 10
+			end
+			task.wait(0.1)
+		end
+		if data.dead or data.detonated then
+			return
+		end
+		data.detonated = true
+		local pos = data.root.Position
+		exploderBlast(data, pos, nil, true)
+		EnemyService.Damage(data, math.huge, nil, false, Vector3.new(0, 1, 0))
+	end)
 end
 
 local function aiTick(dt: number)
@@ -1157,6 +1430,35 @@ local function aiTick(dt: number)
 			continue
 		end
 
+		-- Exploder: close enough -> light the fuse
+		if data.stats.Blast and dist <= data.stats.Blast.Trigger then
+			lightFuse(data)
+			continue
+		end
+
+		-- Spitter: in range with a clear line -> hold position and lob acid
+		local spitCfg = data.stats.Spit
+		if spitCfg and dist >= spitCfg.Min and dist <= 30 then
+			local head = data.model:FindFirstChild("Head")
+			local clear = head and workspace:Raycast(head.Position, targetPos - head.Position, mapRayParams) == nil
+			if clear then
+				hum:MoveTo(root.Position)
+				root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
+				if now >= (data.nextSpit or 0) then
+					data.nextSpit = now + spitCfg.Every * (0.85 + math.random() * 0.3)
+					data.busyUntil = now + spitCfg.Windup + 0.3
+					local tgt = target
+					task.delay(spitCfg.Windup, function()
+						if not data.dead and tgt.Parent then
+							spit(data, tgt)
+						end
+					end)
+				end
+				data.checkAt = nil -- holding still on purpose isn't "lost"
+				continue
+			end
+		end
+
 		-- Periodic groans so players can hear where the horde is (runners are noisier).
 		if now >= data.nextGroan then
 			playSound(data, "ZombieGroan")
@@ -1175,6 +1477,15 @@ local function aiTick(dt: number)
 				if targetHum and targetHum.Health > 0 then
 					PlayerService.Damage(target, data.damage)
 					playSound(data, "ZombieAttack")
+					-- Brute: the swing sends you flying
+					local kb = data.stats.Knockback
+					local tp = kb and game.Players:GetPlayerFromCharacter(target)
+					if tp then
+						local away = Vector3.new(targetPos.X - root.Position.X, 0, targetPos.Z - root.Position.Z)
+						away = away.Magnitude > 0.1 and away.Unit or root.CFrame.LookVector
+						notify:FireClient(tp, "Knockback", { vel = away * kb + Vector3.new(0, 22, 0) })
+						notify:FireClient(tp, "Impact", { tier = "medium" })
+					end
 				end
 			end
 			continue

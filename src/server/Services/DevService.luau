@@ -106,6 +106,28 @@ function DevService.Start()
 				end
 			end
 			return "no boss"
+		elseif cmd == "spawn" then
+			-- spawn `b` (default 1) zombies of type `a` at normal spawn points
+			local n = 0
+			for _ = 1, tonumber(b) or 1 do
+				if EnemyService.Spawn(a or "Shambler", math.max(1, WaveService.GetWave()), nil) then
+					n += 1
+				end
+			end
+			return "spawned " .. n .. " " .. tostring(a)
+		elseif cmd == "hit" then
+			-- damage the first zombie of kind `a` by `b`; returns health before -> after
+			-- (a negative `b` = a headshot)
+			for _, m in game:GetService("CollectionService"):GetTagged("Enemy") do
+				local data = m:GetAttribute("Kind") == a and m.PrimaryPart and EnemyService.GetEnemyFromPart(m.PrimaryPart)
+				if data then
+					local before = data.humanoid.Health
+					local amt = tonumber(b) or 100
+					EnemyService.Damage(data, math.abs(amt), p, amt < 0, nil)
+					return string.format("%s %.0f -> %.0f", a, before, data.dead and 0 or data.humanoid.Health)
+				end
+			end
+			return "none"
 		elseif cmd == "hittotems" then
 			local n = 0
 			for _, m in game:GetService("CollectionService"):GetTagged("Enemy") do
