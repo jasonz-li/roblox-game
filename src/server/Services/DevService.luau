@@ -138,6 +138,12 @@ function DevService.Start()
 				end
 			end
 			return "totems hit " .. n
+		elseif cmd == "shards" and p then
+			-- add Spirit Shards to player 1's saved profile (save/load testing)
+			local DataService = require(script.Parent.DataService)
+			DataService.AddShards(p, tonumber(a) or 1, "Dev")
+			local d = DataService.Get(p)
+			return "shards=" .. tostring(d and d.Shards) .. " unsaved=" .. tostring(d and d.unsaved) .. " online=" .. tostring(p:GetAttribute("DataSaved"))
 		elseif cmd == "killall" then
 			EnemyService.KillAll(true)
 			return "killed all"

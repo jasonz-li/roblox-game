@@ -18,14 +18,17 @@ local DataService = {}
 
 local STORE_NAME = "PlayerData_v1"
 local SCHEMA = 1
-local AUTOSAVE = 90
-local LOCK_TIMEOUT = 600 -- a lock older than this is from a crashed server
+local AUTOSAVE = 90 -- also refreshes the session lock
+local LOCK_TIMEOUT = 300 -- a lock not refreshed for this long is from a crashed server (> 3 autosaves)
 local RETRIES = 5
+local LOCK_WAIT_TRIES = 6 -- locked by another server: retry this many times...
+local LOCK_WAIT_GAP = 5 -- ...this many seconds apart (it's usually mid-save from a server hop)
 
 local store
 local online = false
 local profiles = {} -- [Player] = data table
 local runShards = {} -- [Player] = shards earned this run
+local pendingShards = {} -- [Player] = shards earned before their profile finished loading
 local notify: RemoteEvent
 
 local function defaults()
@@ -85,27 +88,60 @@ local function load(player)
 		publish(player)
 		return
 	end
-	local lockedOut = false
-	local ok, result = retry(function()
-		return store:UpdateAsync(keyFor(player), function(old)
-			if old and old.lock and old.lock.job ~= game.JobId and os.time() - (old.lock.at or 0) < LOCK_TIMEOUT then
-				lockedOut = true
-				return nil -- another server owns this profile: don't write
-			end
-			local data = old and migrate(old) or defaults()
-			data.lock = { job = game.JobId, at = os.time() }
-			return data
+	local lockedOut, ok, result
+	for attempt = 1, LOCK_WAIT_TRIES do
+		lockedOut = false
+		ok, result = retry(function()
+			return store:UpdateAsync(keyFor(player), function(old)
+				if old and old.lock and old.lock.job ~= game.JobId and os.time() - (old.lock.at or 0) < LOCK_TIMEOUT then
+					lockedOut = true
+					return nil -- another server owns this profile: don't write
+				end
+				local data = old and migrate(old) or defaults()
+				data.lock = { job = game.JobId, at = os.time() }
+				return data
+			end)
 		end)
-	end)
+		-- Locked: usually the previous server is still saving (a quick rejoin or a
+		-- server hop). Wait for it to release instead of giving up on the session.
+		if not (ok and lockedOut) or attempt == LOCK_WAIT_TRIES or not player.Parent then
+			break
+		end
+		task.wait(LOCK_WAIT_GAP)
+	end
 	if not player.Parent then
+		-- They left while we were loading. If we took the lock, give it back now, or
+		-- their next join would be locked out until LOCK_TIMEOUT.
+		if ok and not lockedOut and result then
+			local snapshot = table.clone(result)
+			retry(function()
+				return store:UpdateAsync(keyFor(player), function(old)
+					if old and old.lock and old.lock.job ~= game.JobId then
+						return nil
+					end
+					local data = migrate(snapshot)
+					data.lock = nil
+					return data
+				end)
+			end)
+		end
+		pendingShards[player] = nil
 		return
 	end
 	if not ok or lockedOut or not result then
 		warn("[DataService] Could not load data for", player.Name, lockedOut and "(session locked elsewhere)" or tostring(result), "- running unsaved this session")
 		profiles[player] = defaults()
 		profiles[player].unsaved = true
+		notify:FireClient(player, "Message", { text = "Couldn't load your save: progress this session won't be kept. Rejoin to try again.", tone = "bad" })
 	else
 		profiles[player] = result
+	end
+	-- shards earned in the first moments, before the load finished
+	local early = pendingShards[player]
+	pendingShards[player] = nil
+	if early and early > 0 then
+		profiles[player].Shards += early
+		profiles[player].LifetimeShards += early
 	end
 	publish(player)
 end
@@ -140,10 +176,18 @@ end
 -- Award Spirit Shards. `reason` is shown to the player.
 function DataService.AddShards(player: Player, amount: number, reason: string?)
 	local d = profiles[player]
-	if not d or amount <= 0 then
+	if amount <= 0 then
 		return
 	end
 	amount = math.floor(amount)
+	if not d then
+		-- profile still loading: hold the shards and add them once it's in
+		if player.Parent then
+			pendingShards[player] = (pendingShards[player] or 0) + amount
+			runShards[player] = (runShards[player] or 0) + amount
+		end
+		return
+	end
 	d.Shards += amount
 	d.LifetimeShards += amount
 	runShards[player] = (runShards[player] or 0) + amount
@@ -173,11 +217,12 @@ function DataService.StartRun()
 end
 
 -- Called at game over: wave rewards, records, then a summary to each player.
+-- finalWave = the wave the run ended on; on a victory every wave counts as survived.
 function DataService.EndRun(finalWave: number, shardsPerWave: number, victory: boolean?)
 	for _, player in Players:GetPlayers() do
 		local d = profiles[player]
 		if d then
-			local survived = math.max(0, finalWave - 1)
+			local survived = victory and finalWave or math.max(0, finalWave - 1)
 			if survived > 0 then
 				DataService.AddShards(player, survived * shardsPerWave, "Waves survived")
 			end
@@ -226,6 +271,7 @@ function DataService.Start()
 		save(player, true)
 		profiles[player] = nil
 		runShards[player] = nil
+		pendingShards[player] = nil
 	end)
 	game:BindToClose(function()
 		if RunService:IsStudio() and not online then

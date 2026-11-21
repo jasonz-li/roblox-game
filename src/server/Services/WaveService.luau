@@ -211,8 +211,8 @@ local function mainLoop()
 			for _, p in Players:GetPlayers() do
 				DataService.AddShards(p, GameConfig.Run.VictoryShards, "Dustwater cleared")
 			end
-			-- wave + 1 so every wave counts as survived
-			DataService.EndRun(wave + 1, ProgressionConfig.Rewards.ShardsPerWaveSurvived, true)
+			-- victory: EndRun counts every wave as survived (best wave stays 10, not 11)
+			DataService.EndRun(wave, ProgressionConfig.Rewards.ShardsPerWaveSurvived, true)
 			notify:FireAllClients("Victory", { wave = wave })
 		else
 			setState("GameOver")
