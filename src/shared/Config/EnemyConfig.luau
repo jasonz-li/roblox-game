@@ -47,26 +47,28 @@ local Enemies: { [string]: EnemyStats } = {
 		AttackWindup = 0.25,
 		BodyColor = Color3.fromRGB(110, 100, 88),
 		Shape = "Crawler",
-		BonusPoints = 20,
+		BonusPoints = 10,
 	},
-	-- Slow armored wall. Body shots do 40%, headshots full: aim for the head.
+	-- Slow armored wall. Body shots do 50%, headshots full: aim for the head.
 	-- Its swing knocks you back.
+	-- Balance (wave 9, unforged AR): ~9.5s of body shots vs ~2.4s of headshots
+	-- (was 340 HP / 60% armor: 13.5s body, too spongy).
 	Brute = {
 		Id = "Brute",
 		DisplayName = "Brute",
-		BaseHealth = 340,
+		BaseHealth = 300,
 		WalkSpeed = 9,
 		RunSpeed = 13,
-		Damage = 38,
+		Damage = 34,
 		AttackRange = 6,
 		AttackCooldown = 1.7,
 		AttackWindup = 0.65,
 		BodyColor = Color3.fromRGB(88, 96, 84),
 		Shape = "Brute",
 		Scale = 1.45,
-		Armor = 0.6, -- body-shot reduction
+		Armor = 0.5, -- body-shot reduction
 		Knockback = 55,
-		BonusPoints = 100,
+		BonusPoints = 60,
 	},
 	-- Hangs back and lobs acid that leaves a burning pool. Kill it first.
 	Spitter = {
@@ -82,7 +84,7 @@ local Enemies: { [string]: EnemyStats } = {
 		BodyColor = Color3.fromRGB(110, 140, 70),
 		Shape = "Spitter",
 		Spit = { Min = 12, Max = 42, Every = 3.2, Windup = 0.6, Flight = 0.9, PoolRadius = 5, PoolTime = 4, PoolDps = 14 },
-		BonusPoints = 60,
+		BonusPoints = 30,
 	},
 	-- Sprints at you, fuse lit when close, then blows. Shoot it early, ideally inside the
 	-- horde: when it dies it bursts and hurts the zombies around it (and you, if close).
@@ -98,8 +100,10 @@ local Enemies: { [string]: EnemyStats } = {
 		AttackWindup = 0,
 		BodyColor = Color3.fromRGB(150, 110, 70),
 		Shape = "Exploder",
-		Blast = { Trigger = 6, Fuse = 0.8, Radius = 10, PlayerDamage = 45, DeathPlayerMult = 0.5, ZombieDamage = 400 },
-		BonusPoints = 40,
+		-- ZombieDamageMult: x a regular zombie's health this wave (so it pops a horde at
+		-- every wave, instead of a flat 400 that wiped wave 6 and only hurt at wave 9)
+		Blast = { Trigger = 6, Fuse = 0.8, Radius = 10, PlayerDamage = 45, DeathPlayerMult = 0.5, ZombieDamageMult = 1.4 },
+		BonusPoints = 20,
 	},
 }
 

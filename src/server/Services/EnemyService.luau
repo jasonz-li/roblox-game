@@ -504,6 +504,7 @@ function EnemyService.Spawn(enemyId: string, wave: number, opts)
 		damage = stats.Damage * WaveConfig.DamageMultiplier(wave) * (isElite and ProgressionConfig.Elite.DamageMult or 1),
 		isElite = isElite,
 		kind = stats.Id,
+		wave = wave,
 		scale = scale ~= 1 and scale or nil,
 		rootHeight = rootHeightFor(stats) * scale,
 		dead = false,
@@ -881,7 +882,8 @@ local function exploderBlast(data, pos: Vector3, attacker: Player?, reachedTarge
 			CurrencyService.Add(attacker, GameConfigRef.Points.Kill, "Exploder blast", true)
 		end
 	end
-	EnemyService.Explode(pos, b.Radius, b.ZombieDamage, attacker, onKill, Color3.fromRGB(255, 130, 40))
+	local zombieDamage = b.ZombieDamageMult * EnemyConfig.Enemies.Shambler.BaseHealth * WaveConfig.HealthMultiplier(data.wave or 1)
+	EnemyService.Explode(pos, b.Radius, zombieDamage, attacker, onKill, Color3.fromRGB(255, 130, 40))
 end
 
 -- Returns true if this hit killed the enemy. hitDir (optional) = direction of the shot, for knockback.

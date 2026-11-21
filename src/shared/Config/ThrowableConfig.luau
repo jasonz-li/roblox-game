@@ -18,7 +18,9 @@ local ThrowableConfig = {
 		Speed = 48, -- throw speed along your aim (~25 studs aiming level, farther aiming up)
 		Lift = 16, -- extra upward speed for an arc
 		Radius = 13,
-		DamageMult = 2.2, -- x a zombie's base health this wave at the center (half at the edge)
+		-- x a regular zombie's health this wave at the center (half at the edge): kills the
+		-- inner ~3/4 of the blast, wounds the rim (2.2 wiped the whole radius every wave)
+		DamageMult = 1.6,
 		SelfDamage = 30, -- to the thrower at the center (half at the edge): don't cook it at your feet
 		Color = Color3.fromRGB(255, 120, 40),
 		Cooldown = 0.6,
