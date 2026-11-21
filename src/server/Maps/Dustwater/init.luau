@@ -31,8 +31,9 @@ return {
 	Lighting = {
 		ClockTime = 19.1, -- dusk going to night
 		Brightness = 1.1,
-		Ambient = Color3.fromRGB(58, 44, 40),
-		OutdoorAmbient = Color3.fromRGB(96, 70, 54),
+		-- (polish) a little more fill so the ground isn't pitch black away from lamps
+		Ambient = Color3.fromRGB(64, 50, 44),
+		OutdoorAmbient = Color3.fromRGB(112, 84, 64),
 		FogColor = Color3.fromRGB(120, 78, 50),
 		FogStart = 60,
 		FogEnd = 520,

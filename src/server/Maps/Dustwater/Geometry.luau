@@ -277,7 +277,9 @@ return function(api)
 	})
 
 	api.box("Median", V(-10, 0, 180), V(10, 1.2, 200), C(90, 80, 60), "Ground")
-	deadTree(api, 0, 190, 14)
+	-- low stone planter (was a 14-tall dead tree right in the spawn's firing lane)
+	api.box("Planter", V(-3, 1.2, 187), V(3, 3, 193), C(120, 110, 98), "Cobblestone")
+	api.box("PlanterSoil", V(-2.5, 3, 187.5), V(2.5, 3.2, 192.5), C(60, 48, 38), "Ground", { CanCollide = false })
 	fence(api, -96, 172, -80, 172)
 	fence(api, -62, 172, -45, 172)
 	fence(api, 72, 160, 96, 160)
@@ -292,6 +294,11 @@ return function(api)
 	streetLamp(api, 17, 110, -1, 0)
 	streetLamp(api, -33, 205, 1, 0)
 	streetLamp(api, 33, 205, -1, 0)
+	-- (polish) the start area was the darkest place on the map: two more lamps + porch lights
+	streetLamp(api, -17, 178, 1, 0)
+	streetLamp(api, 17, 168, -1, 0)
+	light(api, V(-33, 9, 139), C(255, 190, 120), 22) -- West house porch
+	light(api, V(33, 9, 143), C(255, 190, 120), 22) -- East house porch
 
 	------------------------------------------------------------------
 	-- Zone 1: Main Street — storefront blocks, theater, street, field + junkyard
@@ -440,7 +447,7 @@ return function(api)
 	-- Zone 3: Diner + back alley; sewer ramp down to the lab
 	------------------------------------------------------------------
 	api.shell("Diner", -24, -84, 36, -40, 0, 10, {
-		color = C(215, 215, 220),
+		color = C(206, 228, 216), -- mint (was near-white: the room read as a blank glowing box)
 		trimColor = C(200, 40, 50),
 		openings = {
 			{ side = "s", from = 0, to = 8, height = 8 }, -- front door (D3)
@@ -452,8 +459,24 @@ return function(api)
 			{ side = "n", from = -10, to = -2, bottom = 4.5, height = 3, glass = true },
 		},
 		roof = "flat", parapet = 1.5, roofColor = C(80, 76, 72),
-		floorColor = C(230, 230, 230), floorMaterial = "Marble",
+		floorColor = C(232, 222, 200), floorMaterial = "SmoothPlastic",
 	})
+	-- Checkerboard floor in the dining room (dark tiles over the cream floor)
+	for i = 0, 13 do
+		for j = 0, 7 do
+			if (i + j) % 2 == 0 then
+				local x, z = -22 + i * 4, -74 + j * 4
+				-- just above the shell's floor slab (its top is at y 0.2)
+				api.box("DinerTile", V(x, 0.2, z), V(x + 4, 0.24, z + 4), C(34, 32, 38), "SmoothPlastic", { CanCollide = false, CanQuery = false })
+			end
+		end
+	end
+	-- Red neon strip near the ceiling on the side walls + a jukebox
+	panel(api, "z", 35.5, -1, -75, -41, 8.6, 8.9, C(255, 60, 90), "Neon")
+	panel(api, "z", -23.5, 1, -75, -41, 8.6, 8.9, C(255, 60, 90), "Neon")
+	api.box("Jukebox", V(-23.4, 0, -49), V(-20.6, 5.2, -45), C(120, 40, 60), "SmoothPlastic")
+	local juke = api.box("JukeboxGlow", V(-20.65, 1.5, -48.4), V(-20.5, 4.6, -45.6), C(255, 170, 60), "Neon", { CanCollide = false, CanQuery = false })
+	pointLight(juke, C(255, 150, 80), 12, 1)
 	-- Chrome band + red stripe along the facade
 	-- trim stripes stop at the front door (x 0..8)
 	for _, seg in { { -24, 0 }, { 8, 36 } } do
@@ -482,13 +505,32 @@ return function(api)
 	api.box("PrepTable", V(-23.5, 0, -79), V(-21, 3.4, -77), C(170, 170, 175), "Metal")
 	local sign = api.box("DinerSign", V(-18, 11.5, -41), V(30, 15, -40.4), C(255, 80, 120), "Neon")
 	pointLight(sign, C(255, 90, 130), 26, 1.2)
-	light(api, V(6, 9.4, -62), C(255, 230, 200), 34)
+	-- softer, warmer ceiling lights (the single bright 34-range light washed the room out)
+	for _, x in { -12, 10, 28 } do
+		local l = light(api, V(x, 9.4, -58), C(255, 220, 180), 26)
+		l:FindFirstChildOfClass("PointLight").Brightness = 1.9
+	end
 	light(api, V(0, 9.4, -80), C(255, 240, 220), 18)
 	-- Alley clutter
 	api.box("Dumpster1", V(-62, 0, -110), V(-54, 5, -105), C(40, 80, 50), "Metal")
 	api.box("Dumpster2", V(4, 0, -110), V(12, 5, -105), C(40, 80, 50), "Metal")
 	api.box("Crates", V(-86, 0, -110), V(-80, 4, -102), C(120, 90, 60), "WoodPlanks")
 	api.box("AlleyPipes", V(-96, 12, -84.8), V(36, 12.8, -84), METAL, "Metal")
+	-- String lights strung across the alley (overhead, out of the way) + graffiti
+	local bulbColors = { C(255, 200, 90), C(255, 90, 150), C(90, 220, 255) }
+	for k, x in { -70, -40, -10, 20 } do
+		api.box("StringCable", V(x - 0.08, 11, -111.5), V(x + 0.08, 11.15, -84.5), C(30, 30, 30), "SmoothPlastic", { CanCollide = false, CanQuery = false })
+		for b = 0, 5 do
+			api.part({ Name = "StringBulb", Shape = Enum.PartType.Ball, Size = V(0.5, 0.5, 0.5), Position = V(x, 10.75, -109 + b * 4.5), Color = bulbColors[(b + k) % 3 + 1], Material = "Neon", CanCollide = false, CanQuery = false })
+		end
+		local hub = api.part({ Name = "StringGlow", Size = V(0.2, 0.2, 0.2), Position = V(x, 10, -98), Transparency = 1, CanCollide = false, CanQuery = false })
+		pointLight(hub, C(255, 190, 140), 18, 1.1)
+	end
+	-- graffiti on the diner's back wall (clear of the kitchen door x 12..20 and window x -10..-2)
+	panel(api, "x", -84.5, -1, -42, -30, 1, 6.5, C(230, 60, 140), "SmoothPlastic")
+	panel(api, "x", -84.75, -1, -40, -33, 2.5, 4, C(255, 220, 60), "Neon")
+	panel(api, "x", -84.5, -1, 23, 33, 1.5, 7, C(60, 200, 230), "SmoothPlastic")
+	panel(api, "x", -84.75, -1, 25, 31, 3.5, 4.6, C(255, 255, 255), "SmoothPlastic")
 	-- Sewer ramp into the lab (rails around the opening)
 	-- Sewer ramp into the lab: 10 wide, 66 long (gentle), lit, rails on the alley edges
 	api.ramp("SewerRamp", -86, -99, -20, -89, -20, 0, "w", CONCRETE)
@@ -594,6 +636,21 @@ return function(api)
 	api.box("MotelSignPole", V(173.5, 0, 42.5), V(174.5, 14, 43.5), METAL, "Metal")
 	local msign = api.box("MotelSign", V(172, 14, 40), V(176, 26, 46), C(255, 90, 60), "Neon")
 	pointLight(msign, C(255, 100, 70), 30, 1.4)
+	-- (polish) the lot was pitch black: VACANCY sign, lot lamps, teal glow in the empty pool
+	local vac = api.box("VacancySign", V(172.4, 12, 40.6), V(175.6, 13.6, 45.4), C(90, 255, 140), "Neon", { CanCollide = false })
+	pointLight(vac, C(90, 255, 140), 14, 0.8)
+	streetLamp(api, 190, -45, 1, 0)
+	streetLamp(api, 236, -50, -1, 0)
+	streetLamp(api, 215, 45, 1, 0)
+	for _, p in { V(205, 1.2, -15), V(240, 1.2, -15), V(205, 1.2, 10), V(240, 1.2, 10) } do
+		local g = api.part({ Name = "PoolGlow", Size = V(0.2, 0.2, 0.2), Position = p, Transparency = 1, CanCollide = false, CanQuery = false })
+		pointLight(g, C(70, 220, 210), 22, 1.8)
+	end
+	-- soft neon wash over the lot (the big dark asphalt swallowed the lamps)
+	for _, p in { V(222, 20, -48), V(240, 20, 38) } do
+		local w = api.part({ Name = "LotWash", Size = V(0.2, 0.2, 0.2), Position = p, Transparency = 1, CanCollide = false, CanQuery = false })
+		pointLight(w, C(255, 150, 120), 55, 1.1)
+	end
 
 	-- Pump-house over the storm-drain stairwell (D5 seals its south doorway)
 	api.shell("PumpHouse", 250, -60, 262, -8, 0, 9, {
@@ -693,6 +750,16 @@ return function(api)
 	for _, p in { V(255, -9, -70), V(205, -10.4, -70), V(90, -10.4, -70), V(15, -6.4, -78), V(-10, -6.4, -62), V(-40, -2, -94) } do
 		light(api, p, C(140, 255, 180), 24)
 	end
+	-- (polish) the lab was a bare green box: cyan wall bands, a glowing ring + light at the Forge
+	local CYAN = C(80, 220, 255)
+	panel(api, "x", -99.5, 1, -19, 49, -9.4, -9, CYAN, "Neon")
+	panel(api, "x", -56.5, -1, -19, 49, -9.4, -9, CYAN, "Neon")
+	panel(api, "z", 49.5, -1, -99, -57, -9.4, -9, CYAN, "Neon")
+	panel(api, "z", -19.5, 1, -88, -57, -9.4, -9, CYAN, "Neon") -- stops short of the sewer opening
+	-- (the shell's floor slab tops out at -19.8)
+	api.part({ Name = "ForgeRing", Shape = Enum.PartType.Cylinder, Size = V(0.1, 13, 13), CFrame = CFrame.new(15, -19.74, -95) * CFrame.Angles(0, 0, math.rad(90)), Color = C(255, 210, 90), Material = "Neon", Transparency = 0.45, CanCollide = false, CanQuery = false })
+	local forgeGlow = api.part({ Name = "ForgeGlow", Size = V(0.2, 0.2, 0.2), Position = V(15, -14, -94), Transparency = 1, CanCollide = false, CanQuery = false })
+	pointLight(forgeGlow, C(255, 220, 130), 14, 0.9)
 
 	------------------------------------------------------------------
 	-- Skyline: jagged cliff tops, landmarks past the cliffs, distant mesas.
