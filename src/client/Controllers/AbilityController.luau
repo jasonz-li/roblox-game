@@ -815,6 +815,7 @@ end
 function AbilityController.Start()
 	useRemote = Remotes.Get("UseAbility")
 	selectRemote = Remotes.Get("SelectHero")
+	local throwRemote = Remotes.Get("Throw")
 
 	-- Window repair: hold E anywhere near a damaged window. The server repairs the
 	-- nearest one by position, so you can turn around and shoot while holding.
@@ -843,6 +844,15 @@ function AbilityController.Start()
 			use("Ultimate")
 		elseif input.KeyCode == Enum.KeyCode.H then
 			cycleHero()
+		elseif input.KeyCode == Enum.KeyCode.G or input.KeyCode == Enum.KeyCode.T then
+			-- throwables: Ember Frag (G), Maneki Lure (T). The server checks the count.
+			if player:GetAttribute("Downed") then
+				return
+			end
+			local cam = workspace.CurrentCamera
+			if cam then
+				throwRemote:FireServer(input.KeyCode == Enum.KeyCode.G and "Frag" or "Lure", cam.CFrame.LookVector)
+			end
 		end
 	end)
 

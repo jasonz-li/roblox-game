@@ -19,6 +19,7 @@ local ProgressionService = require(script.Parent.ProgressionService)
 local DataService = require(script.Parent.DataService)
 local AbilityService = require(script.Parent.AbilityService)
 local BossService = require(script.Parent.BossService)
+local ThrowableService = require(script.Parent.ThrowableService)
 local ProgressionConfig = require(game.ReplicatedStorage.Shared.Config.ProgressionConfig)
 
 local WaveService = {}
@@ -156,6 +157,7 @@ local function waveReward()
 	if GameConfig.RefillAmmoOnWaveEnd then
 		WeaponService.RefillAll()
 	end
+	ThrowableService.WaveComplete()
 	notify:FireAllClients("WaveComplete", { wave = wave, bonus = bonus })
 end
 
@@ -167,6 +169,7 @@ local function resetMatch()
 	ProgressionService.Reset()
 	AbilityService.Reset()
 	BossService.Reset()
+	ThrowableService.Reset()
 	CurrencyService.ResetAll()
 	wave = 0
 	gameOver = false

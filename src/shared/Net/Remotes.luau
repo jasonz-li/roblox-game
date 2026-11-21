@@ -18,6 +18,7 @@ local NAMES = {
 	"UseAbility", -- C->S  (slot: "Ability" | "Ultimate", aim: Vector3 look direction)
 	"SelectHero", -- C->S  (heroId: string)  between waves only (dev picker until the lobby)
 	"RepairHold", -- C->S  (holding: boolean)  E held/released: repair the nearest window
+	"Throw", -- C->S  (kind: "Frag" | "Lure", aim: Vector3 look direction)
 }
 
 local Remotes = {}

@@ -17,6 +17,7 @@ local PerkService = require(script.Parent.PerkService)
 local MapService = require(script.Parent.MapService)
 local MysteryBoxService = require(script.Parent.MysteryBoxService)
 local BarrierService = require(script.Parent.BarrierService)
+local ThrowableService = require(script.Parent.ThrowableService)
 
 local InteractionService = {}
 
@@ -116,6 +117,16 @@ function handlers.Barrier(_player: Player, _part: BasePart)
 end
 local _ = BarrierService
 
+function handlers.Lure(player: Player, _part: BasePart)
+	local ok, msg = ThrowableService.BuyLure(player)
+	if ok then
+		sound(player, "Purchase")
+		message(player, msg, "good")
+	else
+		message(player, msg)
+	end
+end
+
 function handlers.MysteryBox(player: Player, _part: BasePart)
 	local ok, reason = MysteryBoxService.OnTriggered(player)
 	if not ok and reason then
@@ -141,6 +152,8 @@ local function promptTexts(part: BasePart)
 		return "Forge held weapon", c[1] .. " / " .. c[2] .. " / " .. c[3] .. " pts (3 levels)"
 	elseif kind == "MysteryBox" then
 		return "Mystery Box", cost .. " pts"
+	elseif kind == "Lure" then
+		return "Buy Maneki Lure", cost .. " pts  •  carry 2  •  throw with T"
 	end
 	return title, tostring(cost)
 end

@@ -14,6 +14,7 @@ local TweenService = game:GetService("TweenService")
 
 local WeaponConfig = require(game.ReplicatedStorage.Shared.Config.WeaponConfig)
 local PerkConfig = require(game.ReplicatedStorage.Shared.Config.PerkConfig)
+local ThrowableConfig = require(game.ReplicatedStorage.Shared.Config.ThrowableConfig)
 local Remotes = require(game.ReplicatedStorage.Shared.Net.Remotes)
 local GameConfig = require(game.ReplicatedStorage.Shared.Config.GameConfig)
 -- Map is chosen by name (GameConfig.ActiveMap); "ShrineDistrict" is the old 4-zone test blockout.
@@ -340,6 +341,49 @@ local function buildForge()
 		{ text = "Upgrade held weapon • " .. WeaponConfig.Upgrade.Cost, size = 18, color = Color3.new(1, 1, 1) },
 	})
 	CollectionService:AddTag(altar, "Interactable")
+end
+
+-- Lure Shrine: a little roadside shrine with a big beckoning cat that sells Maneki Lures
+local function buildLureShrine()
+	local s = Layout.LureShrine
+	if not s then
+		return
+	end
+	local cfg = ThrowableConfig.Lure
+	local cf = CFrame.lookAt(s.Pos, s.Pos + s.Face)
+	local red = Color3.fromRGB(190, 40, 45)
+	local base = part({ Name = "LureShrine", Size = Vector3.new(5, 2.4, 3.5), CFrame = cf * CFrame.new(0, 1.2, 0), Color = Color3.fromRGB(70, 66, 72), Material = Enum.Material.Slate })
+	-- posts + roof beam (a small gate frame)
+	for _, x in { -2.9, 2.9 } do
+		part({ Name = "ShrinePost", Size = Vector3.new(0.5, 7.5, 0.5), CFrame = cf * CFrame.new(x, 3.75, 0.6), Color = red, Material = Enum.Material.Wood })
+	end
+	part({ Name = "ShrineBeam", Size = Vector3.new(7.4, 0.5, 0.8), CFrame = cf * CFrame.new(0, 7.3, 0.6), Color = red, Material = Enum.Material.Wood, CanCollide = false })
+	part({ Name = "ShrineCap", Size = Vector3.new(8.4, 0.35, 1.2), CFrame = cf * CFrame.new(0, 7.75, 0.6), Color = Color3.fromRGB(35, 30, 32), Material = Enum.Material.Wood, CanCollide = false })
+	-- the cat
+	local white = Color3.fromRGB(245, 240, 230)
+	local catCf = cf * CFrame.new(0, 2.4, 0)
+	part({ Name = "CatBody", Size = Vector3.new(1.8, 2.2, 1.5), CFrame = catCf * CFrame.new(0, 1.1, 0), Color = white, Material = Enum.Material.SmoothPlastic, CanCollide = false })
+	part({ Name = "CatHead", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.7, CFrame = catCf * CFrame.new(0, 2.9, 0), Color = white, Material = Enum.Material.SmoothPlastic, CanCollide = false })
+	for _, x in { -0.5, 0.5 } do
+		part({ Name = "CatEar", Size = Vector3.new(0.45, 0.6, 0.25), CFrame = catCf * CFrame.new(x, 3.8, 0), Color = white, Material = Enum.Material.SmoothPlastic, CanCollide = false })
+	end
+	part({ Name = "CatPaw", Size = Vector3.new(0.5, 1.1, 0.5), CFrame = catCf * CFrame.new(1.05, 2.3, -0.2), Color = white, Material = Enum.Material.SmoothPlastic, CanCollide = false })
+	part({ Name = "CatCollar", Size = Vector3.new(1.9, 0.28, 1.6), CFrame = catCf * CFrame.new(0, 2.05, 0), Color = Color3.fromRGB(220, 40, 50), Material = Enum.Material.SmoothPlastic, CanCollide = false })
+	local bell = part({ Name = "CatBell", Shape = Enum.PartType.Ball, Size = Vector3.one * 0.5, CFrame = catCf * CFrame.new(0, 1.9, -0.85), Color = cfg.Color, Material = Enum.Material.Neon, CanCollide = false })
+	local light = Instance.new("PointLight")
+	light.Color = cfg.Color
+	light.Range = 14
+	light.Brightness = 1.5
+	light.Parent = bell
+	base:SetAttribute("Kind", "Lure")
+	base:SetAttribute("Id", "Lure")
+	base:SetAttribute("Cost", cfg.Cost)
+	base:SetAttribute("Title", cfg.DisplayName)
+	surfaceText(base, {
+		{ text = "MANEKI LURE", size = 26, color = cfg.Color },
+		{ text = cfg.Cost .. " PTS  •  T to throw", size = 18, color = Color3.new(1, 1, 1) },
+	})
+	CollectionService:AddTag(base, "Interactable")
 end
 
 local function buildProps()
@@ -794,6 +838,7 @@ local function build()
 	buildWallBuys()
 	buildPerks()
 	buildForge()
+	buildLureShrine()
 	buildMarkers()
 	buildBossArena()
 	clipProps()

@@ -109,6 +109,9 @@ return {
 
 	Forge = { Pos = V(15, -20, -97.5), Face = V(0, 0, 1) },
 
+	-- Maneki Lure shrine: Main Street, south sidewalk against the junkyard wall
+	LureShrine = { Pos = V(70, 0, 9.6), Face = V(0, 0, -1) },
+
 	BoxLocations = {
 		{ Zone = 0, Pos = V(63.2, 0, 185), Face = V(-1, 0, 0) }, -- Elm Lane garage
 		{ Zone = 1, Pos = V(-112, 0, 9.7), Face = V(0, 0, -1) }, -- Main Street, south sidewalk (junkyard is gone)

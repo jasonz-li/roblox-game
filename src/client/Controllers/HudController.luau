@@ -133,6 +133,8 @@ local function buildAmmo()
 	ui.ammoMag = label({ Text = "30", TextSize = 46, TextXAlignment = Enum.TextXAlignment.Right, Position = UDim2.fromOffset(12, 24), Size = UDim2.new(1, -110, 0, 50), Parent = panel })
 	ui.ammoReserve = label({ Text = "/ 180", Font = Enum.Font.GothamBold, TextSize = 22, TextColor3 = Color3.fromRGB(190, 190, 210), TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(1, -94, 0, 40), Size = UDim2.fromOffset(84, 28), Parent = panel })
 	ui.reloadHint = label({ Text = "", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = ACCENT, TextXAlignment = Enum.TextXAlignment.Right, Position = UDim2.new(0, 12, 1, -22), Size = UDim2.new(1, -24, 0, 16), Parent = panel })
+	-- throwables: frags (G) and lures (T), just above the ammo panel
+	ui.throwables = label({ Text = "", RichText = true, Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = Color3.fromRGB(220, 220, 230), TextXAlignment = Enum.TextXAlignment.Right, Position = UDim2.new(0, 0, 0, -20), Size = UDim2.new(1, -4, 0, 16), Parent = panel })
 end
 
 local function buildHealthAndPoints()
@@ -640,6 +642,18 @@ function HudController.Start()
 	player:GetAttributeChangedSignal("PerkOrder"):Connect(refreshPerks)
 	refreshSlots()
 	refreshPerks()
+
+	local function refreshThrowables()
+		local frags, lures = player:GetAttribute("Frags") or 0, player:GetAttribute("Lures") or 0
+		local function part(n, key, name, color)
+			local c = n > 0 and color or "#6e6e78"
+			return string.format('<font color="%s">%s %d</font> <font color="#9a9aa8" size="11">[%s]</font>', c, name, n, key)
+		end
+		ui.throwables.Text = part(frags, "G", "FRAG", "#ff8a3c") .. "   " .. part(lures, "T", "LURE", "#ffd25a")
+	end
+	player:GetAttributeChangedSignal("Frags"):Connect(refreshThrowables)
+	player:GetAttributeChangedSignal("Lures"):Connect(refreshThrowables)
+	refreshThrowables()
 
 	if player.Character then
 		task.spawn(bindCharacter, player.Character)

@@ -1009,6 +1009,34 @@ local function insideDome(pos: Vector3, pad: number?): any
 	return nil
 end
 
+-- Maneki Lures (ThrowableService): zombies within a lure's radius go for it instead
+-- of players. { pos, radius, untilT (os.clock) }
+local lures = {}
+function EnemyService.AddLure(pos: Vector3, radius: number, untilT: number)
+	table.insert(lures, { pos = pos, radius = radius, untilT = untilT })
+end
+
+function EnemyService.ClearLures()
+	table.clear(lures)
+end
+
+local function nearestLure(pos: Vector3): any
+	local now = os.clock()
+	local best, bestDist = nil, math.huge
+	for i = #lures, 1, -1 do
+		local l = lures[i]
+		if now > l.untilT then
+			table.remove(lures, i)
+		else
+			local d = (l.pos - pos).Magnitude
+			if d <= l.radius and d < bestDist then
+				best, bestDist = l, d
+			end
+		end
+	end
+	return best, bestDist
+end
+
 local function requestPath(data, targetPos: Vector3)
 	data.computingPath = true
 	data.lastPathTime = os.clock()
@@ -1359,6 +1387,34 @@ local function aiTick(dt: number)
 
 		local targetRoot = target.HumanoidRootPart
 		local targetPos = targetRoot.Position
+
+		-- A Maneki Lure nearby: forget the players, crowd around the charm.
+		-- (Exploders that reach it blow up there. The Titan ignores lures.)
+		local lure, lureDist = nil, 0
+		if not data.isBoss and not EnemyService.IsFrozen(data) then
+			lure, lureDist = nearestLure(root.Position)
+		end
+		if lure then
+			data.checkAt = nil -- not lost: it's busy with the lure
+			data.inReachSince = nil
+			if data.stats.Blast and lureDist <= data.stats.Blast.Trigger then
+				lightFuse(data)
+			elseif lureDist <= 3.5 then
+				hum:MoveTo(root.Position) -- pawing at it
+			elseif workspace:Raycast(root.Position, lure.pos - root.Position, mapRayParams) == nil then
+				data.waypoints = nil
+				hum:MoveTo(lure.pos)
+			else
+				if (not data.waypoints or now - data.lastPathTime > EnemyConfig.PathRecomputeInterval) and not data.computingPath and pathBudget > 0 then
+					pathBudget -= 1
+					requestPath(data, lure.pos)
+				end
+				if not followPath(data) then
+					hum:MoveTo(lure.pos)
+				end
+			end
+			continue
+		end
 
 		-- No jumping in a crowd around a player: jumps there land zombies on heads
 		-- (the "floating" zombies). Path jumps far away still work.
