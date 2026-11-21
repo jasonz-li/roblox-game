@@ -96,6 +96,26 @@ function DevService.Start()
 				end
 			end
 			return "boss hp set"
+		elseif cmd == "hitboss" then
+			-- damage the Titan through the real damage path (shield, stagger, threat, core)
+			for _, m in game:GetService("CollectionService"):GetTagged("Enemy") do
+				local data = m:GetAttribute("Boss") and m.PrimaryPart and EnemyService.GetEnemyFromPart(m.PrimaryPart)
+				if data and data.isBoss and not data.dead then
+					EnemyService.Damage(data, tonumber(a) or 500, p, false, nil)
+					return string.format("hp=%.0f vuln=%s immune=%s", data.humanoid.Health, tostring(data.vulnerableUntil and os.clock() < data.vulnerableUntil), tostring(data.immune))
+				end
+			end
+			return "no boss"
+		elseif cmd == "hittotems" then
+			local n = 0
+			for _, m in game:GetService("CollectionService"):GetTagged("Enemy") do
+				local data = m:GetAttribute("Totem") and m.PrimaryPart and EnemyService.GetEnemyFromPart(m.PrimaryPart)
+				if data then
+					EnemyService.Damage(data, math.huge, p, false, nil)
+					n += 1
+				end
+			end
+			return "totems hit " .. n
 		elseif cmd == "killall" then
 			EnemyService.KillAll(true)
 			return "killed all"

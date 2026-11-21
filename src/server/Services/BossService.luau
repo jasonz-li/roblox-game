@@ -319,6 +319,10 @@ function BossService.Run(wave: number, power: number, isOver)
 		-- phase changes
 		if phase == 1 and frac <= CFG.Phase2At then
 			phase = 2
+			-- one huge burst can't skip the totem phase
+			if boss.humanoid.Health > 0 then
+				boss.humanoid.Health = math.clamp(boss.humanoid.Health, maxHp * (CFG.Phase3At + 0.02), maxHp * CFG.Phase2At)
+			end
 			gameState:SetAttribute("BossPhase", 2)
 			setShield(boss, true)
 			boss.busyUntil = math.huge -- stands and channels the siege
@@ -326,7 +330,7 @@ function BossService.Run(wave: number, power: number, isOver)
 			spawnTotems()
 			ProgressionService.OfferUpgrades(wave)
 			nextRing = now + 3
-		elseif phase == 2 and frac <= CFG.Phase3At then
+		elseif phase == 2 and not boss.immune and frac <= CFG.Phase3At then
 			phase = 3
 			gameState:SetAttribute("BossPhase", 3)
 			ProgressionService.OfferUpgrades(wave)

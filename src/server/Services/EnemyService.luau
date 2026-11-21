@@ -1216,7 +1216,7 @@ local function aiTick(dt: number)
 		if not data.checkAt then
 			data.checkAt, data.checkDist = now + check, dist
 		elseif now >= data.checkAt then
-			if dist > (hunting and 25 or 35) and dist > data.checkDist - 6 then
+			if not data.isBoss and dist > (hunting and 25 or 35) and dist > data.checkDist - 6 then
 				relocate(data)
 				continue
 			end
